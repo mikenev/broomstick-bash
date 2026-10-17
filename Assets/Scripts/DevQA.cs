@@ -13,7 +13,7 @@ namespace BroomstickBash {
       GameEvents.BossStarted += () => { minFireballDist = 999f; Debug.Log($"[QA] boss start t={Time.time:0.00} hazards={FindObjectsByType<Fireball>(FindObjectsSortMode.None).Length} obstacles={FindObjectsByType<ObstacleBase>(FindObjectsSortMode.None).Length}"); };
       GameEvents.BossPhaseChanged += p => Debug.Log($"[QA] boss phase {p}");
       GameEvents.BossDefeated += () => Debug.Log("[QA] boss defeated");
-      GameEvents.Win += () => Debug.Log($"[QA] WIN minFireballSpawnDist={minFireballDist:0.00} fired={Werewolf.FiredPatterns} rejected={Werewolf.RejectedPatterns}");
+      GameEvents.Won += _ => Debug.Log($"[QA] WIN minFireballSpawnDist={minFireballDist:0.00} fired={Werewolf.FiredPatterns} rejected={Werewolf.RejectedPatterns}");
       GameEvents.GameOver += () => Debug.Log($"[QA] GAME OVER minFireballSpawnDist={minFireballDist:0.00}");
     }
     void Update(){

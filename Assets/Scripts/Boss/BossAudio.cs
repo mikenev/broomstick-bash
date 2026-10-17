@@ -11,12 +11,12 @@ namespace BroomstickBash {
     }
     void OnEnable(){
       GameEvents.BossStarted += OnStart; GameEvents.BossPhaseChanged += OnPhase; GameEvents.BossHurt += OnHurt;
-      GameEvents.BossFired += OnFire; GameEvents.BossDefeated += OnDefeat; GameEvents.Win += OnWin;
+      GameEvents.BossFired += OnFire; GameEvents.BossDefeated += OnDefeat; GameEvents.Won += OnWin;
       GameEvents.GameOver += StopMusic; GameEvents.RunReset += StopMusic;
     }
     void OnDisable(){
       GameEvents.BossStarted -= OnStart; GameEvents.BossPhaseChanged -= OnPhase; GameEvents.BossHurt -= OnHurt;
-      GameEvents.BossFired -= OnFire; GameEvents.BossDefeated -= OnDefeat; GameEvents.Win -= OnWin;
+      GameEvents.BossFired -= OnFire; GameEvents.BossDefeated -= OnDefeat; GameEvents.Won -= OnWin;
       GameEvents.GameOver -= StopMusic; GameEvents.RunReset -= StopMusic;
     }
     void One(AudioClip c, float v = 1f){ if (c) sfx.PlayOneShot(c, sfxVolume * v); }
@@ -25,7 +25,7 @@ namespace BroomstickBash {
     void OnHurt(int hp){ if (hp > 0) One(hurt, 0.7f); }
     void OnFire(){ One(throwSfx, 0.6f); }
     void OnDefeat(){ StopMusic(); One(defeat); }
-    void OnWin(){ One(victory); }
+    void OnWin(int score){ One(victory); }
     void StopMusic(){ if (music) music.Stop(); }
   }
 }
