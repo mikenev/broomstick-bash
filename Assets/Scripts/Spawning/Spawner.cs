@@ -6,7 +6,8 @@ namespace BroomstickBash {
   public class Spawner : MonoBehaviour, IDifficultySource {
     public SpawnTable table;
     public Transform cam, player;
-    public float spawnAhead = LevelPlanner.SpawnAhead, despawnBehind = 14f;
+    public float spawnAhead => LevelPlanner.SpawnAhead;   // single source of truth shared with the fairness validator
+    public float despawnBehind = 14f;
     public System.Func<float> difficultyOverride;   // hook: custom curve / QA
     public bool spawning = true;
     readonly List<ObstacleBase> live = new();
@@ -16,7 +17,7 @@ namespace BroomstickBash {
       Mathf.Clamp01(t.difficultyByProgress.Evaluate(Mathf.Clamp01(distance / Mathf.Max(1, t.rampDistance))));
     public float Difficulty => difficultyOverride != null ? difficultyOverride() : DifficultyAt(table, GameManager.I ? GameManager.I.Distance : 0);
     public float SpeedMultiplier => table.speedByDifficulty.Evaluate(Difficulty);
-    LevelPlanner Planner => planner ??= new LevelPlanner(new System.Random(), GameConfig.I.groundY, GameConfig.I.ceilingY);
+    LevelPlanner Planner => planner ??= new LevelPlanner(new System.Random(), GameConfig.I.groundY, GameConfig.I.ceilingY){ table = table };
 
     public void ResetSpawner(){ ClearAll(); timer = 1.5f; spawning = true; Planner.Reset(); lastSpawnDistance = 0; }
     public void ClearAll(bool puff = false){

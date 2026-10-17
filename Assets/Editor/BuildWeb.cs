@@ -145,6 +145,8 @@ public static class BuildWeb {
 
   /// <summary>M2: make sure the saved table has the LampPost entry and the M2 difficulty/speed/interval curves (keeps any art prefabs).</summary>
   static void EnsureM2Table(SpawnTable table){
+    // applied once (version-gated) so later Inspector tuning is not clobbered by rebuilds
+    if (table.m2TuningVersion >= 1) return;
     if (table.EntryFor(ObstacleKind.LampPost) == null) table.entries.Add(new SpawnEntry{ kind = ObstacleKind.LampPost, weight = 1.5f });
     SpawnTable.ApplyM2Curve(table); EditorUtility.SetDirty(table); AssetDatabase.SaveAssets();
   }
@@ -163,7 +165,7 @@ public static class BuildWeb {
     var templates = new System.Collections.Generic.Dictionary<string, int>(); var kinds = new System.Collections.Generic.Dictionary<ObstacleKind, int>();
     float levelTime = 0, fullAt = -1;
     for (int seed = 0; seed < Seeds; seed++){
-      var rng = new System.Random(seed); var pl = new LevelPlanner(rng, ground, ceiling);
+      var rng = new System.Random(seed); var pl = new LevelPlanner(rng, ground, ceiling){ table = table };
       float dist = 0, t = 0, timer = 1.5f, lastSpawn = 0; Vector2 prevWin = default; bool hasPrev = false;
       while (dist < table.bossDistance){
         float d = Spawner.DifficultyAt(table, dist), v = baseSpeed * table.speedByDifficulty.Evaluate(d);

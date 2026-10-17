@@ -46,9 +46,22 @@ namespace BroomstickBash {
 
     public float groundY = 0, ceilingY = 10;
     public System.Random rng;
+    /// <summary>Optional: SpawnTable whose entry weight / minDifficulty gate which kinds the templates use (weight 0 = disabled).</summary>
+    public SpawnTable table;
+    float W(ObstacleKind k, float d){
+      if (!table) return 1f; var e = table.EntryFor(k);
+      return e == null || d < e.minDifficulty ? 0f : Mathf.Max(0f, e.weight);
+    }
+    /// <summary>Weighted pick among kinds by table weight; returns fallback if all are zero.</summary>
+    ObstacleKind PickKind(float d, ObstacleKind fallback, params ObstacleKind[] ks){
+      float tot = 0; foreach (var k in ks) tot += W(k, d);
+      if (tot <= 0) return fallback;
+      float r = R(0, tot); foreach (var k in ks){ r -= W(k, d); if (r <= 0) return k; }
+      return ks[ks.Length - 1];
+    }
     Vector2 prevSafe; float prevMinSpeed; bool hasPrev;
     public LevelPlanner(System.Random r, float ground, float ceiling){ rng = r; groundY = ground; ceilingY = ceiling; Reset(); }
-    public void Reset(){ hasPrev = false; prevSafe = new Vector2(PlayerMinY, ceilingY - PlayerMaxOff); prevMinSpeed = 0; }
+    public void Reset(){ hasPrev = false; prevSafe = new Vector2(groundY + PlayerMinY, ceilingY - PlayerMaxOff); prevMinSpeed = 0; }
 
     float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
 
@@ -104,15 +117,16 @@ namespace BroomstickBash {
 
     // ---- pattern templates ----
     PlannedItem Ground(float d){
-      double r = rng.NextDouble();
-      if (r < 0.45) return Kid(d, 0);
-      if (r < 0.75) return new PlannedItem{ kind = ObstacleKind.Car, y = groundY, speed = R(1.2f, 1.5f + 1.5f * d) };
+      var k = PickKind(d, ObstacleKind.Kid, ObstacleKind.Kid, ObstacleKind.Car, ObstacleKind.LampPost);
+      if (k == ObstacleKind.Kid) return Kid(d, 0);
+      if (k == ObstacleKind.Car) return new PlannedItem{ kind = ObstacleKind.Car, y = groundY, speed = R(1.2f, 1.5f + 1.5f * d) };
       return new PlannedItem{ kind = ObstacleKind.LampPost, y = groundY, size = R(3.2f, 4.2f + 1.6f * d) };
     }
     PlannedItem Kid(float d, float dx) => new PlannedItem{ kind = ObstacleKind.Kid, y = groundY, size = R(0.9f, 1.8f), speed = R(0.3f, 1.0f), dx = dx };
     PlannedItem Ceiling(float d) => new PlannedItem{ kind = ObstacleKind.Branch, y = ceilingY, size = R(2.2f, 3.0f + 1.4f * d) };
     PlannedItem Flyer(float d, bool allowGhost, float lo, float hi){
-      if (allowGhost && d >= 0.15f && rng.NextDouble() < 0.4)
+      var fk = allowGhost ? PickKind(d, ObstacleKind.Bat, ObstacleKind.Bat, ObstacleKind.Ghost) : ObstacleKind.Bat;
+      if (fk == ObstacleKind.Ghost)
         return new PlannedItem{ kind = ObstacleKind.Ghost, y = R(lo + 1.2f, hi - 1.2f), amp = R(0.6f, 0.8f + 0.6f * d), speed = 1.2f };
       return new PlannedItem{ kind = ObstacleKind.Bat, y = R(lo + 1.6f, hi), amp = R(0.8f, 1.2f + 0.8f * d), speed = R(2.0f, 2.5f + 1.0f * d) };
     }
@@ -124,15 +138,19 @@ namespace BroomstickBash {
       float top = ceilingY - 0.5f, bot = groundY + 1f;
       if (r < w1){
         int k = rng.Next(3); c.template = "single";
+        if (k == 1 && W(ObstacleKind.Branch, d) <= 0) k = 0;
         c.items.Add(k == 0 ? Ground(d) : k == 1 ? Ceiling(d) : Flyer(d, allowGhost, 3f, 8f));
       } else if (r < w1 + w2){
         int k = rng.Next(4);
+        if ((k == 0 || k == 2) && W(ObstacleKind.Branch, d) <= 0) k = 1;
+        if (k == 3 && W(ObstacleKind.Kid, d) <= 0) k = 1;
         if (k == 0){ c.template = "ground+ceiling"; c.items.Add(Ground(d)); c.items.Add(Ceiling(d)); }
         else if (k == 1){ c.template = "ground+flyer"; c.items.Add(Ground(d)); c.items.Add(Flyer(d, allowGhost, 5.5f, top)); }
         else if (k == 2){ c.template = "ceiling+flyer"; c.items.Add(Ceiling(d)); c.items.Add(Flyer(d, allowGhost, bot + 0.5f, 4.5f)); }
         else { c.template = "kid-group"; c.items.Add(Kid(d, -1.3f)); c.items.Add(Kid(d, 0)); if (d > 0.5f) c.items.Add(Kid(d, 1.3f)); }
       } else {
         int k = rng.Next(2);
+        if (k == 0 && W(ObstacleKind.Branch, d) <= 0) k = 1;
         if (k == 0){ c.template = "ground+flyer+ceiling"; c.items.Add(Ground(d)); c.items.Add(Ceiling(d)); c.items.Add(Flyer(d, allowGhost, 3.5f, 7f)); }
         else { c.template = "bat-flock"; float y0 = R(4f, 6f); c.items.Add(new PlannedItem{ kind = ObstacleKind.Bat, y = y0 + 3.2f, amp = 0.8f, speed = 2.6f });
                c.items.Add(new PlannedItem{ kind = ObstacleKind.Bat, y = y0 - 1.6f, amp = 0.8f, speed = 2.6f, dx = 1.2f }); }

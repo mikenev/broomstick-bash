@@ -15,7 +15,7 @@ namespace BroomstickBash {
     public int KillScore { get; private set; }
     public int HighScore { get; private set; }
     public float ScrollSpeed => GameConfig.I.scrollSpeed * (State == GameState.Boss ? 1f : spawner.SpeedMultiplier);
-    bool newHigh; float endTime; int restartFrame = -1;
+    bool newHigh; float endTime;
 
     void Awake(){ I = this; Layers.Validate(); HighScore = PlayerPrefs.GetInt(HighKey, 0); Application.targetFrameRate = 60; }
     void OnEnable(){ GameEvents.EnemyKilled += OnKill; }
@@ -39,9 +39,9 @@ namespace BroomstickBash {
     }
     public void GameOver(){ if (!IsActive) return; State = GameState.GameOver; End(); GameEvents.GameOver?.Invoke(); GameEvents.RunEnded?.Invoke(false, Score); }
     public void Win(){ if (State != GameState.Boss) return; KillScore += 500; State = GameState.Win; End(); GameEvents.Won?.Invoke(Score); GameEvents.RunEnded?.Invoke(true, Score); }
-    /// <summary>Playtest fix: restarting from game over / win goes straight into a new run (no title screen), and the
-    /// restarting flap is not double-counted as a gameplay flap on the same frame.</summary>
-    void Restart(){ ResetRun(); State = GameState.Playing; player.Flap(); restartFrame = Time.frameCount; }
+    /// <summary>Playtest fix: restarting from game over / win (flap or R) goes straight into a new run instead of the title.
+    /// The caller returns before player.Tick, so the restarting flap is applied exactly once.</summary>
+    void Restart(){ ResetRun(); State = GameState.Playing; player.Flap(); }
     void End(){
       endTime = Time.unscaledTime;
       if (Score > HighScore){ HighScore = Score; newHigh = true; PlayerPrefs.SetInt(HighKey, Score); PlayerPrefs.Save(); }
@@ -51,13 +51,13 @@ namespace BroomstickBash {
       if (kb != null && kb.bKey.wasPressedThisFrame) StartBoss();          // debug/QA: jump to boss
       bool ended = State == GameState.GameOver || State == GameState.Win;
       if (kb != null && kb.rKey.wasPressedThisFrame && State != GameState.Ready){ if (ended) Restart(); else ResetRun(); return; }
-      if (State == GameState.Ready){ if (PlayerController.FlapPressed()){ StartRun(); restartFrame = Time.frameCount; } return; }
+      if (State == GameState.Ready){ if (PlayerController.FlapPressed()) StartRun(); return; }
       if (ended){
         if (Time.unscaledTime - endTime > 0.6f && PlayerController.FlapPressed()) Restart();
         return;
       }
       float dt = Time.deltaTime, v = ScrollSpeed;
-      player.Tick(dt, v, Time.frameCount != restartFrame);
+      player.Tick(dt, v);
       if (State == GameState.Playing){
         Distance += v * dt;
         if (Distance >= spawner.table.bossDistance) StartBoss();

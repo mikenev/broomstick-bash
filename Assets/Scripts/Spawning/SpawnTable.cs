@@ -7,7 +7,8 @@ namespace BroomstickBash {
     [Tooltip("Optional prefab (M2 art). If null, ObstacleFactory builds a gray-box version.")] public GameObject prefab;
     public float weight = 1f;
     [Range(0, 1)] public float minDifficulty = 0f;
-    public float minY = 0f, maxY = 0f;   // used by flyers; ground/ceiling kinds ignore
+    [Tooltip("M1 legacy (SpawnOne only). M2 LevelPlanner picks heights itself so the fairness validator can guarantee a gap; weight/minDifficulty DO gate M2 kinds (Branch weight only enables/disables ceiling templates).")]
+    public float minY = 0f, maxY = 0f;
   }
   /// <summary>Data-driven spawn table + difficulty ramp. M2: tune weights/curves or add entries in the asset.</summary>
   [CreateAssetMenu(menuName = "Broomstick Bash/Spawn Table")]
@@ -19,6 +20,7 @@ namespace BroomstickBash {
     [Tooltip("Distance (m) at which the boss appears")] public float bossDistance = 450f;
     [Tooltip("M2: difficulty 0..1 vs ramp progress (Distance / rampDistance), non-linear with breathers")]
     public AnimationCurve difficultyByProgress = AnimationCurve.Linear(0, 0, 1, 1);
+    [Tooltip("M2 tuning version applied by BuildWeb (0 = M1 asset). Bump only to re-apply defaults.")] public int m2TuningVersion;
     public SpawnEntry EntryFor(ObstacleKind k){ foreach (var e in entries) if (e.kind == k) return e; return null; }
 
     public SpawnEntry Pick(float difficulty){
@@ -49,7 +51,7 @@ namespace BroomstickBash {
         new Keyframe(1f, 1f, 2.2f, 0f));
       t.speedByDifficulty = new AnimationCurve(new Keyframe(0, 1f), new Keyframe(0.5f, 1.22f), new Keyframe(1, 1.6f));
       t.intervalByDifficulty = new AnimationCurve(new Keyframe(0, 1.9f), new Keyframe(0.5f, 1.25f), new Keyframe(1, 0.9f));
-      t.bossDistance = 1150f; t.rampDistance = t.bossDistance * 0.85f;
+      t.bossDistance = 1150f; t.rampDistance = t.bossDistance * 0.85f; t.m2TuningVersion = 1;
     }
   }
   /// <summary>Difficulty hook: 0..1. Override via Spawner.difficultyOverride for testing or a custom curve.</summary>

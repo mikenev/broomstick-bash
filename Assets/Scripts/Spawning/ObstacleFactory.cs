@@ -4,6 +4,8 @@ namespace BroomstickBash {
   public static class ObstacleFactory {
     public static ObstacleBase Create(SpawnEntry e, float x, GameConfig cfg){
       GameObject go; ObstacleBase ob;
+      if (e.kind == ObstacleKind.LampPost) // M2 kind: build via the planned-item path
+        return Create(new PlannedItem{ kind = ObstacleKind.LampPost, y = cfg.groundY, size = Random.Range(3.2f, 5f) }, x, cfg, null);
       if (e.prefab){
         go = Object.Instantiate(e.prefab, new Vector3(x, Y(e, cfg), 0), Quaternion.identity);
         ob = go.GetComponent<ObstacleBase>(); if (!ob) ob = go.AddComponent<ObstacleBase>();
