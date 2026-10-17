@@ -1,10 +1,10 @@
 {
- "Witch": 436,
+ "Witch": 872,
  "Kid_Pumpkin": 300,
  "Kid_SheetGhost": 242,
  "Kid_Robot": 280,
- "Bat": 108,
- "Ghost": 212,
+ "Bat": 264,
+ "Ghost": 424,
  "Car_Red": 296,
  "Car_Teal": 306,
  "Branch": 220,
@@ -13,7 +13,7 @@
  "BG_HousesFar": 210,
  "BG_HousesNear": 768,
  "BG_Pumpkins": 908,
- "Werewolf": 296,
+ "Werewolf": 592,
  "FX_Spell": 104,
  "FX_Sparkle": 44,
  "FX_Fireball": 64

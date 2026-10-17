@@ -38,7 +38,7 @@ public static class BroomArtSetup {
       {"Jeans", new Color(0.20f,0.30f,0.55f)},
       {"Black", new Color(0.05f,0.05f,0.07f)},
       {"BatWing", new Color(0.22f,0.12f,0.30f)},
-      {"GhostBody", new Color(0.40f,0.95f,0.85f)},
+      {"GhostBody", new Color(0.58f,1.0f,0.93f)},
       {"EyeGlow", new Color(0.70f,1.0f,0.30f)},
       {"Fur", new Color(0.35f,0.30f,0.32f)},
       {"FurDark", new Color(0.20f,0.17f,0.20f)},
@@ -55,26 +55,35 @@ public static class BroomArtSetup {
       {"BarkDark", new Color(0.14f,0.10f,0.09f)},
       {"LeafOrange", new Color(0.85f,0.40f,0.08f)},
       {"Lamp", new Color(0.18f,0.18f,0.22f)},
-      {"HouseA", new Color(0.28f,0.22f,0.40f)},
-      {"HouseB", new Color(0.22f,0.26f,0.42f)},
-      {"HouseC", new Color(0.35f,0.20f,0.30f)},
-      {"Roof", new Color(0.12f,0.10f,0.18f)},
-      {"WindowGlow", new Color(1.0f,0.70f,0.25f)},
-      {"FarHouse", new Color(0.14f,0.12f,0.26f)},
+      {"HouseA", new Color(0.17f,0.17f,0.27f)},
+      {"HouseB", new Color(0.14f,0.16f,0.27f)},
+      {"HouseC", new Color(0.19f,0.16f,0.26f)},
+      {"Roof", new Color(0.08f,0.08f,0.14f)},
+      {"WindowGlow", new Color(0.55f,0.46f,0.34f)},
+      {"FarHouse", new Color(0.09f,0.09f,0.18f)},
       {"Moon", new Color(0.95f,0.93f,0.75f)},
       {"MoonCrater", new Color(0.80f,0.78f,0.62f)},
-      {"Cloud", new Color(0.30f,0.32f,0.50f)},
-      {"Fence", new Color(0.18f,0.14f,0.20f)},
-      {"PumpkinGlow", new Color(1.0f,0.75f,0.20f)},
+      {"Cloud", new Color(0.20f,0.22f,0.36f)},
+      {"Fence", new Color(0.10f,0.10f,0.16f)},
+      {"PumpkinGlow", new Color(0.62f,0.42f,0.20f)},
+      {"PumpkinBG", new Color(0.42f,0.24f,0.12f)},
+      {"StemBG", new Color(0.14f,0.20f,0.12f)},
       {"SpellGlow", new Color(0.75f,0.40f,1.0f)},
       {"SparkleGlow", new Color(1.0f,0.95f,0.55f)},
       {"FireGlow", new Color(1.0f,0.45f,0.08f)},
       {"FireCore", new Color(1.0f,0.85f,0.30f)},
-      {"Grass", new Color(0.12f,0.20f,0.16f)},
+      {"Grass", new Color(0.08f,0.11f,0.14f)},
+      {"OutlineWarm", new Color(1.0f,0.82f,0.50f)},
+      {"OutlineCool", new Color(0.70f,0.95f,1.0f)},
       {"Gold", new Color(1.0f,0.76f,0.15f)},
   };
   static readonly HashSet<string> Looping = new() { "Fly", "Walk", "Flap@Bat", "Float", "Idle" };
   static readonly string[] Static = { "Car_Red", "Car_Teal", "Branch", "LampPost", "BG_Moon", "BG_HousesFar", "BG_HousesNear", "BG_Pumpkins", "FX_Spell", "FX_Sparkle", "FX_Fireball" };
+  /// <summary>Background-only glows kept dim so windows / jack-o'-lanterns don't compete with gameplay objects.</summary>
+  static readonly HashSet<string> BackgroundGlow = new() { "WindowGlow", "PumpkinGlow" };
+  /// <summary>Art-only upscale for the kid costumes (applied to the prefab's Model child, so BroomArtSkin's fit-to-gray-box
+  /// scale on the instance root and the gray-box collider are unchanged; feet stay on the ground because the origin is at the feet).</summary>
+  public const float KidArtScale = 1.45f;
   static readonly string[] Kids = { "Kid_Pumpkin", "Kid_SheetGhost", "Kid_Robot" };
   static readonly string[] Animated = { "Witch", "Werewolf", "Bat", "Ghost", "Kid_Pumpkin", "Kid_SheetGhost", "Kid_Robot" };
 
@@ -102,17 +111,21 @@ public static class BroomArtSetup {
   static Material Mat(string name, Color c){
     var p = $"{Mats}/BA_{name}.mat";
     var m = AssetDatabase.LoadAssetAtPath<Material>(p);
-    if (!m){ m = new Material(Shader.Find("Universal Render Pipeline/Lit")); AssetDatabase.CreateAsset(m, p); }
+    var shader = Shader.Find(name.StartsWith("Outline") ? "Universal Render Pipeline/Unlit" : "Universal Render Pipeline/Lit");
+    if (!m){ m = new Material(shader); AssetDatabase.CreateAsset(m, p); }
+    if (m.shader != shader) m.shader = shader;
+    if (name.StartsWith("Outline")){ // inverted-hull outline shell (flipped faces in the mesh, Cull Back): flat unlit rim colour
+      m.SetColor("_BaseColor", c); m.SetFloat("_Cull", 2); EditorUtility.SetDirty(m); return m; }
     bool ghost = name.StartsWith("Ghost");
-    m.SetColor("_BaseColor", ghost ? new Color(c.r, c.g, c.b, 0.55f) : c); // Gamma colour space: palette used as-is
+    m.SetColor("_BaseColor", ghost ? new Color(c.r, c.g, c.b, 0.8f) : c); // Gamma colour space: palette used as-is
     m.SetFloat("_Metallic", name == "Metal" || name == "Gold" ? 0.5f : 0f); m.SetFloat("_Smoothness", name == "Glass" ? 0.6f : 0.12f);
-    if (name.EndsWith("Glow")){ m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", c * 0.9f); m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None; }
+    if (name.EndsWith("Glow")){ m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", c * (BackgroundGlow.Contains(name) ? 0.35f : 0.9f)); m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None; }
     else { m.DisableKeyword("_EMISSION"); m.SetColor("_EmissionColor", Color.black); }
     if (ghost){ // translucent enemy ghosts
       m.SetFloat("_Surface", 1); m.SetFloat("_Blend", 0); m.SetFloat("_ZWrite", 0); m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
       m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha); m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
       m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent; m.SetOverrideTag("RenderType", "Transparent");
-      m.SetColor("_EmissionColor", c * 0.25f); m.EnableKeyword("_EMISSION");
+      m.SetColor("_EmissionColor", c * 0.4f); m.EnableKeyword("_EMISSION");
     }
     EditorUtility.SetDirty(m); return m;
   }
@@ -164,6 +177,7 @@ public static class BroomArtSetup {
     var root = new GameObject("BA_" + n);
     var model = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>($"{Models}/{n}.fbx"));
     model.name = "Model"; model.transform.SetParent(root.transform, false); model.transform.localRotation = Quaternion.Euler(0, ModelYaw, 0);
+    if (Kids.Contains(n)) model.transform.localScale = Vector3.one * KidArtScale;
     foreach (var r in model.GetComponentsInChildren<Renderer>()){
       bool cheap = n.StartsWith("BG_") || n.StartsWith("FX_") || n == "Ghost";
       r.shadowCastingMode = cheap ? UnityEngine.Rendering.ShadowCastingMode.Off : UnityEngine.Rendering.ShadowCastingMode.On;
@@ -183,7 +197,7 @@ public static class BroomArtSetup {
       var inst = Object.Instantiate(p); int t = 0; Bounds b = default; bool first = true;
       foreach (var r in inst.GetComponentsInChildren<Renderer>(true)){
         var mesh = r is SkinnedMeshRenderer s ? s.sharedMesh : r.GetComponent<MeshFilter>().sharedMesh; t += mesh.triangles.Length / 3;
-        foreach (var m in r.sharedMaterials) if (!m || m.shader.name != "Universal Render Pipeline/Lit") throw new System.Exception(n + ": bad material");
+        foreach (var m in r.sharedMaterials) if (!m || (m.shader.name != "Universal Render Pipeline/Lit" && !(m.name.StartsWith("BA_Outline") && m.shader.name == "Universal Render Pipeline/Unlit"))) throw new System.Exception(n + ": bad material " + (m ? m.name : "null"));
         if (first){ b = r.bounds; first = false; } else b.Encapsulate(r.bounds);
       }
       var an = inst.GetComponentInChildren<Animator>();
