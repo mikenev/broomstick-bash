@@ -150,8 +150,11 @@ public static class BuildWeb {
       PlayerSettings.WebGL.decompressionFallback = true;
       PlayerSettings.WebGL.threadsSupport = false;
       PlayerSettings.productName = "Broomstick Bash"; PlayerSettings.companyName = "mikenev";
-      var outDir = Path.GetFullPath("docs");
-      var r = BuildPipeline.BuildPlayer(new[]{ ScenePath }, outDir, BuildTarget.WebGL, BuildOptions.None);
+      bool dev = System.Environment.GetEnvironmentVariable("BB_DEV") == "1";   // dev build w/ stack traces, for debugging only
+      if (dev){ PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.FullWithStacktrace; PlayerSettings.SetStackTraceLogType(LogType.Exception, StackTraceLogType.Full); }
+      else PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly;
+      var outDir = Path.GetFullPath(dev ? "Builds/WebGLDev" : "docs");
+      var r = BuildPipeline.BuildPlayer(new[]{ ScenePath }, outDir, BuildTarget.WebGL, dev ? BuildOptions.Development : BuildOptions.None);
       Debug.Log("BUILD RESULT: " + r.summary.result + " size=" + r.summary.totalSize);
       if (r.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded){ File.WriteAllText(Path.Combine(outDir, ".nojekyll"), ""); code = 0; }
     } catch (System.Exception e){ Debug.LogException(e); }

@@ -10,15 +10,4 @@ namespace BroomstickBash {
       transform.rotation = Quaternion.Euler(2f, 0, 0);
     }
   }
-  /// <summary>Recycles background houses / street tiles around the camera.</summary>
-  public class Scenery : MonoBehaviour {
-    public Transform cam; public float span = 60f;
-    void LateUpdate(){
-      foreach (Transform c in transform){
-        var p = c.position;
-        if (p.x < cam.position.x - span * 0.5f) { p.x += span; c.position = p; }
-        else if (p.x > cam.position.x + span * 0.5f) { p.x -= span; c.position = p; }
-      }
-    }
-  }
 }
