@@ -63,7 +63,7 @@ namespace BroomstickBash {
     float TargetX => cam.position.x + 7.5f;
     void Update(){
       var gm = GameManager.I; if (!gm || !gm.IsActive) return;
-      float dt = Time.deltaTime; t += dt;
+      float dt = Time.deltaTime; t += dt; if (immuneCue > 0) immuneCue -= dt;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
       if (Keyboard.current != null && Keyboard.current.kKey.wasPressedThisFrame) Damage(1);   // dev-only QA: auto-hit
 #endif
@@ -224,17 +224,16 @@ namespace BroomstickBash {
     }
 
     // Spell during entry grace: fizzle sparkle on the boss + a short floating "IMMUNE" cue.
-    float immuneCue;
+    float immuneCue; const float ImmuneCueTime = 1.2f;
     void Fizzle(){
       Puff.Burst(transform.position + new Vector3(-1.2f, 0.4f, -0.5f), GameConfig.I.sparkleMat, 5, 0.1f, 2f);
-      immuneCue = 0.8f; GameEvents.BossImmune?.Invoke();
+      immuneCue = ImmuneCueTime; GameEvents.BossImmune?.Invoke();
     }
     GUIStyle cueStyle;
     void OnGUI(){
-      if (immuneCue <= 0) return;
-      immuneCue -= Time.unscaledDeltaTime;
+      if (immuneCue <= 0) return;   // decremented in Update (OnGUI runs several times per frame)
       var cam0 = Camera.main; if (!cam0) return;
-      var sp = cam0.WorldToScreenPoint(transform.position + Vector3.up * (2.2f + (0.8f - immuneCue) * 0.6f));
+      var sp = cam0.WorldToScreenPoint(transform.position + new Vector3(-1.8f, 0.8f + (ImmuneCueTime - immuneCue) * 0.6f, 0));
       if (sp.z < 0) return;
       float sc = Screen.height / 720f;
       cueStyle ??= new GUIStyle(GUI.skin.label){ alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
