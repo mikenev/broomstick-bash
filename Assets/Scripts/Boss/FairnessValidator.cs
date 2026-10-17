@@ -95,7 +95,7 @@ namespace BroomstickBash {
     /// next one is planned. Checks (a) whatever PlanFair returns is fair with the live fireballs, and counts how often it had to
     /// adjust or skip. Returns (cases, unfairCommitted, skipped).</summary>
     public static int OverlapConflictsCaught;
-    public static (int total, int unfair, int skipped) OverlapSweep(PhaseTuning[] phases, FlapModel m, int seeds = 8){
+    public static (int total, int unfair, int skipped) OverlapSweep(PhaseTuning[] phases, FlapModel m, int seeds = 8, float restScale = 1f){
       int total = 0, bad = 0, skip = 0; OverlapConflictsCaught = 0;
       for (int p = 0; p < phases.Length; p++)
         foreach (AttackKind prevK in System.Enum.GetValues(typeof(AttackKind)))
@@ -110,7 +110,7 @@ namespace BroomstickBash {
                 var prev = ToAbsolute(FireballPatterns.Build(prevK, tun, bossRel, y0, m.groundY, m.ceilingY, rng), y0);
                 var live = new List<Shot>();
                 foreach (var sh in prev){
-                  var c = sh; float tt = tun.rest - c.delay;
+                  var c = sh; float tt = tun.rest * restScale - c.delay;
                   if (tt < 0){ c.delay = -tt; tt = 0; } else c.delay = 0;   // not yet launched (staggered arcs)
                   c.pos += c.vel * tt + 0.5f * c.gravity * tt * tt * Vector2.down; c.vel += c.gravity * tt * Vector2.down; c.live = true;
                   if (c.pos.x > -1.5f && c.pos.y > -1f) live.Add(c);

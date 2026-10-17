@@ -15,6 +15,10 @@ public static class BossFairnessTest {
     Debug.Log($"[Fairness] negative control (0.6 m gap wall) rejected: {detects}");
     var (ot, obad, oskip) = FairnessValidator.OverlapSweep(Werewolf.DefaultPhases(), FlapModel.Default);
     Debug.Log($"[Fairness] overlap: {ot} cases (live fireballs from previous attack), unfair committed={obad}, skipped={oskip} ({100f * oskip / ot:0.0}%), naive plans the live-check caught={FairnessValidator.OverlapConflictsCaught}");
+    // stress: previous attack fired only 0.1x its rest ago (fireballs still near the boss) - exercises the live check
+    var (st, sbad, sskip) = FairnessValidator.OverlapSweep(Werewolf.DefaultPhases(), FlapModel.Default, 8, 0.1f);
+    Debug.Log($"[Fairness] overlap stress (0.1x rest): {st} cases, unfair committed={sbad}, skipped={sskip}, naive plans the live-check caught={FairnessValidator.OverlapConflictsCaught}");
+    obad += sbad;
     // live fireball that sits on the witch's only escape: must be rejected
     var liveWall = new System.Collections.Generic.List<Shot>();
     for (float y = 0.9f; y <= 9.4f; y += 0.9f) liveWall.Add(new Shot{ pos = new Vector2(4f, y), vel = new Vector2(-4f, 0), live = true });
