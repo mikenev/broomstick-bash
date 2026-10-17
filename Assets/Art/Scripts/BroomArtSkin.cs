@@ -5,7 +5,7 @@ namespace BroomstickBash.Art {
   /// <summary>Optional, code-free art hookup for the M1 gray-box objects. Each frame it looks at the scene's root objects
   /// (spawned obstacles are roots) and, for known names, hides the gray-box renderers and attaches the matching art prefab,
   /// fitted to the gray-box size. Colliders, layers, transforms and gameplay scripts are not touched.
-  /// Matched names: Kid, Car, Branch, Ghost, Bat, Fireball, Boss. Disable with BroomArtSkin.Enabled = false before scene load.
+  /// Matched names: Kid, Car, Branch, LampPost, Ghost, Bat, Fireball, Boss. This is the ONLY obstacle art path (SpawnEntry.prefab is unused). Disable with BroomArtSkin.Enabled = false before scene load.
   /// The player (Witch) and background are not auto-skinned: PlayerController re-enables its cached renderers while
   /// flashing, and the parallax layers need a scroller - both should be wired in M1 code (see Assets/Art/README.md).</summary>
   public class BroomArtSkin : MonoBehaviour {
@@ -37,6 +37,8 @@ namespace BroomstickBash.Art {
           Fit(r, Kids[Random.Range(0, Kids.Length)], h / 1.3f, new Vector3(0, -1f, 0), false); return true; }
         case "Car": { var g = Fit(r, Random.value < 0.5f ? "Car_Red" : "Car_Teal", 0.8f, new Vector3(0, -0.5f, 0)); return true; }
         case "Branch": { float len = r.transform.lossyScale.y; Fit(r, "Branch", len / 3.05f, new Vector3(0, 0.5f, 0)); return true; }
+        case "LampPost": { var pole = r.transform.Find("Pole"); float h = pole ? pole.localScale.y * 2f : 4f; // pole height (root scale 1, origin at ground)
+          Fit(r, "LampPost", h / 4f, Vector3.zero); return true; }
         case "Ghost": Fit(r, "Ghost", 0.9f, Vector3.zero, false); return true;
         case "Bat": Fit(r, "Bat", 1.6f, Vector3.zero, false); return true;
         case "Fireball": Fit(r, "FX_Fireball", 0.9f, Vector3.zero, false); return true;

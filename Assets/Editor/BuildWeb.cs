@@ -84,8 +84,10 @@ public static class BuildWeb {
       var lamp = Block(cfg, "Lamp", cfg.cylinder, cfg.houseMat, new Vector3(x + 4.5f, 1.6f, 4f), new Vector3(0.15f, 1.6f, 0.15f), houses.transform);
       Block(cfg, "LampLight", cfg.sphere, windowMat, new Vector3(x + 4.5f, 3.3f, 4f), Vector3.one * 0.4f, lamp.transform);
     }
-    Block(cfg, "Moon", cfg.sphere, Mat("Moon", new Color(1f, 1f, 0.85f), new Color(0.8f, 0.8f, 0.6f)), new Vector3(0, 0, 0), Vector3.one * 6, camGo.transform)
-      .transform.localPosition = new Vector3(14, 8, 60);
+    var grayMoon = Block(cfg, "Moon", cfg.sphere, Mat("Moon", new Color(1f, 1f, 0.85f), new Color(0.8f, 0.8f, 0.6f)), new Vector3(0, 0, 0), Vector3.one * 6, camGo.transform);
+    grayMoon.transform.localPosition = new Vector3(14, 8, 60);
+    var parallax = new GameObject("ParallaxBackground").AddComponent<ParallaxBackground>();
+    parallax.cam = camGo.transform; parallax.grayHouses = houses.gameObject; parallax.grayMoon = grayMoon;
 
     var spawner = new GameObject("Spawner").AddComponent<Spawner>();
     spawner.table = table; spawner.cam = camGo.transform; spawner.player = player.transform;

@@ -31,7 +31,7 @@ namespace BroomstickBash {
       Distance = 0; Kills = 0; KillScore = 0; newHigh = false; State = GameState.Ready;
       GameEvents.RunReset?.Invoke();
     }
-    public void StartRun(){ if (State == GameState.Ready){ State = GameState.Playing; player.Flap(); } }
+    public void StartRun(){ if (State == GameState.Ready){ State = GameState.Playing; player.Flap(); player.StartGrace(); } }
     public void StartBoss(){
       if (State == GameState.Ready) StartRun();
       if (State != GameState.Playing) return;
@@ -41,7 +41,7 @@ namespace BroomstickBash {
     public void Win(){ if (State != GameState.Boss) return; KillScore += 500; State = GameState.Win; End(); GameEvents.Won?.Invoke(Score); GameEvents.RunEnded?.Invoke(true, Score); }
     /// <summary>Playtest fix: restarting from game over / win (flap or R) goes straight into a new run instead of the title.
     /// The caller returns before player.Tick, so the restarting flap is applied exactly once.</summary>
-    void Restart(){ ResetRun(); State = GameState.Playing; player.Flap(); }
+    void Restart(){ ResetRun(); State = GameState.Playing; player.Flap(); player.StartGrace(); }
     void End(){
       endTime = Time.unscaledTime;
       if (Score > HighScore){ HighScore = Score; newHigh = true; PlayerPrefs.SetInt(HighKey, Score); PlayerPrefs.Save(); }
@@ -50,7 +50,7 @@ namespace BroomstickBash {
       var kb = Keyboard.current;
       if (kb != null && kb.bKey.wasPressedThisFrame) StartBoss();          // debug/QA: jump to boss
       bool ended = State == GameState.GameOver || State == GameState.Win;
-      if (kb != null && kb.rKey.wasPressedThisFrame && State != GameState.Ready){ if (ended) Restart(); else ResetRun(); return; }
+      if (kb != null && kb.rKey.wasPressedThisFrame && State != GameState.Ready){ if (ended){ if (Time.unscaledTime - endTime > 0.6f) Restart(); } else ResetRun(); return; }
       if (State == GameState.Ready){ if (PlayerController.FlapPressed()) StartRun(); return; }
       if (ended){
         if (Time.unscaledTime - endTime > 0.6f && PlayerController.FlapPressed()) Restart();
@@ -82,10 +82,16 @@ namespace BroomstickBash {
       // spell cooldown meter
       float frac = player.castCooldown > 0 ? 1f - Mathf.Clamp01(player.CooldownLeft / player.castCooldown) : 1f;
       GUI.Label(new Rect(20*s, 118*s, 120*s, 34*s), "Spell", small);
-      GUI.color = new Color(0, 0, 0, 0.6f); GUI.DrawTexture(new Rect(95*s, 126*s, 160*s, 16*s), white);
-      GUI.color = frac >= 1f ? new Color(0.6f, 1f, 0.4f) : new Color(0.45f, 0.55f, 0.4f); GUI.DrawTexture(new Rect(95*s, 126*s, 160*s * frac, 16*s), white);
+      bool ready = frac >= 1f;
+      var bar = new Rect(95*s, 124*s, 180*s, 20*s);
+      if (!ready){ // drained: pulsing red outline + red track so it reads at a glance
+        GUI.color = Color.Lerp(new Color(1f, 0.15f, 0.1f), new Color(1f, 0.6f, 0.2f), Mathf.PingPong(Time.unscaledTime * 6f, 1f));
+        GUI.DrawTexture(new Rect(bar.x - 3*s, bar.y - 3*s, bar.width + 6*s, bar.height + 6*s), white);
+      }
+      GUI.color = ready ? new Color(0, 0, 0, 0.6f) : new Color(0.35f, 0.05f, 0.05f, 0.95f); GUI.DrawTexture(bar, white);
+      GUI.color = ready ? new Color(0.6f, 1f, 0.4f) : new Color(1f, 0.75f, 0.25f); GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * frac, bar.height), white);
       GUI.color = Color.white;
-      if (frac >= 1f) GUI.Label(new Rect(265*s, 118*s, 400*s, 34*s), "READY (X / F / right-click)", small);
+      GUI.Label(new Rect(285*s, 118*s, 420*s, 34*s), ready ? "READY (X / F / right-click)" : "RECHARGING...", small);
       if (State == GameState.Boss){
         float w = 400 * s, x = (Screen.width - w) / 2;
         GUI.color = new Color(0, 0, 0, 0.6f); GUI.DrawTexture(new Rect(x, 20*s, w, 22*s), white);
