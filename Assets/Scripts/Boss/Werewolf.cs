@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using BroomstickBash.Art;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
 using UnityEngine.InputSystem;
 #endif
@@ -10,6 +11,8 @@ namespace BroomstickBash {
   public class Werewolf : MonoBehaviour {
     enum Mode { Entering, Idle, Telegraph, Defeated }
     [Header("Art")] public GameObject visualPrefab; public Transform grayBox;
+    public Vector3 artOffset = new Vector3(-0.2f, -1.75f, 0); public float artScale = 1.25f;
+    GameObject art; Animator anim;
     [Header("Refs")] public Transform cam, player;
     [Header("Stats")] public int maxHp = 12;
     public float entryGrace = 2.5f;               // witch invulnerable + no attacks after boss entry
@@ -34,7 +37,15 @@ namespace BroomstickBash {
 
     void Awake(){
       mpb = new MaterialPropertyBlock();
-      if (visualPrefab){ Instantiate(visualPrefab, transform, false); if (grayBox) grayBox.gameObject.SetActive(false); }
+      if (!visualPrefab) visualPrefab = BroomArt.Load("Werewolf");   // fallback: Art Dev's Resources prefab
+      if (visualPrefab){
+        art = Instantiate(visualPrefab, transform, false); art.name = "Art_Werewolf";
+        foreach (var c in art.GetComponentsInChildren<Collider>()) Destroy(c);
+        // art faces +X with its front to the camera; mirror on X so it faces the witch (-X) and still shows its front
+        art.transform.localPosition = artOffset; art.transform.localScale = new Vector3(-artScale, artScale, artScale);
+        if (grayBox) grayBox.gameObject.SetActive(false);
+        anim = art.GetComponentInChildren<Animator>();
+      }
       rends = GetComponentsInChildren<Renderer>(false);
       pc = player ? player.GetComponent<PlayerController>() : null;
     }
@@ -44,7 +55,8 @@ namespace BroomstickBash {
       gameObject.SetActive(true);
       Hp = maxHp; t = 0; mode = Mode.Entering; timer = entryGrace; attackIdx = 0; flash = 0; defeatT = 0;
       transform.position = new Vector3(cam.position.x + 16f, 5f, 0); transform.rotation = Quaternion.identity; transform.localScale = Vector3.one;
-      SetTint(null);
+      SetTint(null); foreach (var r in rends) if (r) r.enabled = true;
+      if (anim){ anim.Rebind(); anim.Update(0f); }
       GameEvents.BossStarted?.Invoke();
     }
 
@@ -136,6 +148,7 @@ namespace BroomstickBash {
         Spawn(s, at);
       }
       ClearTells(); SetTint(null); transform.localScale = Vector3.one;
+      if (art) BroomArt.Trigger(art, "Throw");
       mode = Mode.Idle; timer = Tuning.rest; FiredPatterns++;
       GameEvents.BossFired?.Invoke();
     }
@@ -159,6 +172,7 @@ namespace BroomstickBash {
       int before = Phase;
       Hp -= n; flash = 0.1f; SetTint(Color.white);
       Puff.Burst(transform.position + Vector3.left, GameConfig.I.sparkleMat, 6);
+      if (art && Hp > 0) BroomArt.Trigger(art, "Hurt");
       GameEvents.BossHurt?.Invoke(Hp);
       if (Hp <= 0){ StartDefeat(); return; }
       if (Phase != before){ Puff.Burst(transform.position, GameConfig.I.fireMat, 14, 0.25f, 6f); GameEvents.BossPhaseChanged?.Invoke(Phase); }
@@ -169,6 +183,7 @@ namespace BroomstickBash {
       mode = Mode.Defeated; defeatT = 0; poofed = false; ClearTells(); StopAllCoroutines(); SetTint(Color.white);
       foreach (var f in FindObjectsByType<Fireball>(FindObjectsSortMode.None)) Destroy(f.gameObject);
       if (pc) pc.GrantInvulnerability(5f);
+      if (art) BroomArt.Trigger(art, "Defeat");
       GameEvents.BossDefeated?.Invoke();
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
       Debug.Log("[Werewolf] DEFEATED");

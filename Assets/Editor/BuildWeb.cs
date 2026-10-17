@@ -109,6 +109,7 @@ public static class BuildWeb {
     foreach (Transform c in gb) c.gameObject.layer = Layers.Enemy;
     var bcol = bossGo.AddComponent<BoxCollider>(); bcol.center = new Vector3(-0.3f, 0.2f, 0); bcol.size = new Vector3(2.0f, 3.2f, 1.2f);
     var boss = bossGo.AddComponent<Werewolf>(); boss.cam = camGo.transform; boss.player = player.transform; boss.grayBox = gb;
+    boss.visualPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Art/Resources/Art/BA_Werewolf.prefab");   // Art PR #3 (null -> gray box)
     var ba = new GameObject("BossAudio").AddComponent<BossAudio>();
     AudioClip Clip(string n) => AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/" + n);
     ba.bossTheme = Clip("Music/boss_theme_loop.ogg"); ba.victory = Clip("Music/victory_sting.ogg");
