@@ -21,9 +21,9 @@ namespace BroomstickBash {
     public SpawnEntry Pick(float difficulty){
       float total = 0; foreach (var e in entries) if (difficulty >= e.minDifficulty) total += e.weight;
       if (total <= 0) return null;
-      float r = Random.value * total;
-      foreach (var e in entries){ if (difficulty < e.minDifficulty) continue; r -= e.weight; if (r <= 0) return e; }
-      return entries[entries.Count - 1];
+      float r = Random.value * total; SpawnEntry last = null;
+      foreach (var e in entries){ if (difficulty < e.minDifficulty) continue; last = e; r -= e.weight; if (r <= 0) return e; }
+      return last;   // float rounding fallback: last *eligible* entry
     }
     public static SpawnTable CreateDefault(){
       var t = CreateInstance<SpawnTable>();

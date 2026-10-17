@@ -17,7 +17,7 @@ namespace BroomstickBash {
     public float ScrollSpeed => GameConfig.I.scrollSpeed * (State == GameState.Boss ? 1f : spawner.SpeedMultiplier);
     bool newHigh; float endTime;
 
-    void Awake(){ I = this; HighScore = PlayerPrefs.GetInt(HighKey, 0); Application.targetFrameRate = 60; }
+    void Awake(){ I = this; Layers.Validate(); HighScore = PlayerPrefs.GetInt(HighKey, 0); Application.targetFrameRate = 60; }
     void OnEnable(){ GameEvents.EnemyKilled += OnKill; }
     void OnDisable(){ GameEvents.EnemyKilled -= OnKill; }
     void Start(){ ResetRun(); }
