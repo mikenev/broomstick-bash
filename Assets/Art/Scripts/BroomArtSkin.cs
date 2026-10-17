@@ -31,7 +31,8 @@ namespace BroomstickBash.Art {
       if (!keepRotation) g.transform.rotation = Quaternion.identity;
       return g;
     }
-    static bool Skin(GameObject r){
+    /// <summary>Skins one root by name. Public so the editor validator can verify one-art-instance-per-obstacle.</summary>
+    public static bool Skin(GameObject r){
       switch (r.name){
         case "Kid": { float h = r.transform.lossyScale.y * 2f; // capsule mesh is 2 units tall
           Fit(r, Kids[Random.Range(0, Kids.Length)], h / 1.3f, new Vector3(0, -1f, 0), false); return true; }
