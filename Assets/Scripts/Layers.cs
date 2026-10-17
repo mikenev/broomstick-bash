@@ -19,6 +19,7 @@ namespace BroomstickBash {
     public static System.Action<bool, int> RunEnded;
     public static System.Action<AttackKind> BossTelegraph;   // M3: wind-up began (audio/VFX hook)
     public static System.Action<int> BossHurt, BossPhaseChanged;   // M3
-    public static void Clear(){ PlayerHit = null; EnemyKilled = null; BossStarted = BossDefeated = GameOver = RunReset = BossFired = null; Won = null; RunEnded = null; BossTelegraph = null; BossHurt = BossPhaseChanged = null; }
+    public static System.Action BossImmune;   // spell hit the boss during its entry grace (fizzle)
+    public static void Clear(){ PlayerHit = null; EnemyKilled = null; BossStarted = BossDefeated = GameOver = RunReset = BossFired = null; Won = null; RunEnded = null; BossTelegraph = null; BossHurt = BossPhaseChanged = null; BossImmune = null; }
   }
 }

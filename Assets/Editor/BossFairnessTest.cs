@@ -13,7 +13,20 @@ public static class BossFairnessTest {
     var shots = FireballPatterns.Build(AttackKind.Wall, tight, new Vector2(10.9f, 0), 5f, 0, 10, new System.Random(1));
     bool detects = !FairnessValidator.IsFair(FairnessValidator.ToAbsolute(shots, 5f), FlapModel.Default, 5f, 0, 1f);
     Debug.Log($"[Fairness] negative control (0.6 m gap wall) rejected: {detects}");
-    return bad == 0 && detects;
+    var (ot, obad, oskip) = FairnessValidator.OverlapSweep(Werewolf.DefaultPhases(), FlapModel.Default);
+    Debug.Log($"[Fairness] overlap: {ot} cases (live fireballs from previous attack), unfair committed={obad}, skipped={oskip} ({100f * oskip / ot:0.0}%), naive plans the live-check caught={FairnessValidator.OverlapConflictsCaught}");
+    // stress: previous attack fired only 0.1x its rest ago (fireballs still near the boss) - exercises the live check
+    var (st, sbad, sskip) = FairnessValidator.OverlapSweep(Werewolf.DefaultPhases(), FlapModel.Default, 8, 0.1f);
+    Debug.Log($"[Fairness] overlap stress (0.1x rest): {st} cases, unfair committed={sbad}, skipped={sskip}, naive plans the live-check caught={FairnessValidator.OverlapConflictsCaught}");
+    obad += sbad;
+    // live fireball that sits on the witch's only escape: must be rejected
+    var liveWall = new System.Collections.Generic.List<Shot>();
+    for (float y = 0.9f; y <= 9.4f; y += 0.9f) liveWall.Add(new Shot{ pos = new Vector2(4f, y), vel = new Vector2(-4f, 0), live = true });
+    var aimed = FireballPatterns.Build(AttackKind.Aimed, new PhaseTuning(), new Vector2(10.9f, 0), 5f, 0, 10, new System.Random(2));
+    var all = FairnessValidator.ToAbsolute(aimed, 5f); all.AddRange(liveWall);
+    bool liveDetects = !FairnessValidator.IsFair(all, FlapModel.Default, 5f, 0, 1f);
+    Debug.Log($"[Fairness] negative control (live solid wall in the air) rejected: {liveDetects}");
+    return bad == 0 && detects && obad == 0 && liveDetects && oskip <= ot * 0.3f;
   }
   public static void RunBatch(){ bool ok = Run(); if (Application.isBatchMode) EditorApplication.Exit(ok ? 0 : 1); }
 }
