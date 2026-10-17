@@ -3,7 +3,9 @@ using UnityEngine;
 namespace BroomstickBash {
   public enum AttackKind { Aimed, Arc, Wall }
   /// <summary>One planned fireball, in the witch's frame: offset from the witch at fire time and relative velocity.</summary>
-  public struct Shot { public Vector2 pos; public Vector2 vel; public float gravity; public float delay; }
+  public struct Shot { public Vector2 pos; public Vector2 vel; public float gravity; public float delay;
+    /// <summary>true = a fireball already in the air (moves from t=0, not after the telegraph). pos.y is absolute.</summary>
+    public bool live; }
 
   /// <summary>Per-phase tuning (phase 0 = full HP ... 2 = low HP). Tuned for casual players.</summary>
   [System.Serializable] public class PhaseTuning {

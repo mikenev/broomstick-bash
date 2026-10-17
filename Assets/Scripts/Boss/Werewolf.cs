@@ -74,7 +74,7 @@ namespace BroomstickBash {
       p.y = Mathf.Lerp(p.y, 5f + Mathf.Sin(t * 0.9f) * bobAmp, 3f * dt);
       transform.position = p;
 
-      if (flash > 0){ flash -= dt; if (flash <= 0) SetTint(mode == Mode.Telegraph ? TellColor : (Color?)null); }
+      if (flash > 0){ flash -= dt; if (flash <= 0){ if (mode == Mode.Telegraph) SetTint(TellColor, TellBlend); else SetTint(null); } }
       timer -= dt;
       switch (mode){
         case Mode.Entering: if (timer <= 0){ mode = Mode.Idle; timer = 0.6f; } break;
@@ -91,27 +91,24 @@ namespace BroomstickBash {
       var tun = Tuning; var m = FlapModel.From(pc, GameConfig.I);
       float y = player.position.y, vy = pc.VelocityY; planY = y;
       var order = tun.attacks; pending = order[attackIdx++ % order.Length];
-      planned = null;
-      // runtime fairness check: try a few random variants, then fall back to a single slow aimed shot, else skip
-      for (int tries = 0; tries < 5 && planned == null; tries++){
-        var rel = FireballPatterns.Build(pending, tun, HandRel, y, m.groundY, m.ceilingY, rng);
-        EnforceMinDistance(rel);
-        if (rel.Count > 0 && FairnessValidator.IsFair(FairnessValidator.ToAbsolute(rel, y), m, y, vy, tun.telegraph)) planned = rel;
-        else RejectedPatterns++;
-      }
-      if (planned == null){
-        pending = AttackKind.Aimed;
-        var fb = new PhaseTuning{ fireballSpeed = 3.2f, aimedCount = 1, telegraph = tun.telegraph };
-        var rel = FireballPatterns.Build(AttackKind.Aimed, fb, HandRel, y, m.groundY, m.ceilingY, rng);
-        EnforceMinDistance(rel);
-        planned = rel.Count > 0 && FairnessValidator.IsFair(FairnessValidator.ToAbsolute(rel, y), m, y, vy, tun.telegraph) ? rel : null;
-      }
+      // runtime fairness check, including fireballs still in the air (see FairnessValidator.PlanFair)
+      planned = FairnessValidator.PlanFair(ref pending, tun, HandRel, y, vy, LiveShots(), m, rng, minSpawnDistance, out int rej);
+      RejectedPatterns += rej;
       if (planned == null){ timer = tun.rest; return; }   // nothing fair right now: skip a beat
-      mode = Mode.Telegraph; timer = tun.telegraph; committed = tun;   // phase can't change a committed attack SetTint(TellColor);
+      mode = Mode.Telegraph; timer = tun.telegraph; committed = tun;   // phase can't change a committed attack
+      SetTint(TellColor, TellBlend);
       SpawnTells();
       GameEvents.BossTelegraph?.Invoke(pending);
     }
-    void EnforceMinDistance(List<Shot> rel){ rel.RemoveAll(s => s.pos.magnitude < minSpawnDistance); }
+    /// <summary>Fireballs already in the air, in the witch's frame (x and velocity relative to her, y absolute).</summary>
+    List<Shot> LiveShots(){
+      var live = new List<Shot>(); float scroll = GameManager.I.ScrollSpeed;
+      foreach (var f in FindObjectsByType<Fireball>(FindObjectsSortMode.None)){
+        var p = f.transform.position;
+        live.Add(new Shot{ pos = new Vector2(p.x - player.position.x, p.y), vel = new Vector2(f.vel.x - scroll, f.vel.y), gravity = f.gravity, live = true });
+      }
+      return live;
+    }
 
     // Tell: glowing "ghost" orbs where each fireball will appear, growing through the wind-up; boss tints + crouches.
     void SpawnTells(){
@@ -168,9 +165,10 @@ namespace BroomstickBash {
     }
 
     public void Damage(int n){
-      if (Hp <= 0 || mode == Mode.Defeated || mode == Mode.Entering) return;
+      if (mode == Mode.Entering){ Fizzle(); return; }       // entry/grace: immune, but show it
+      if (Hp <= 0 || mode == Mode.Defeated) return;
       int before = Phase;
-      Hp -= n; flash = 0.1f; SetTint(Color.white);
+      Hp -= n; flash = 0.1f; SetTint(Color.white, 0.8f);
       Puff.Burst(transform.position + Vector3.left, GameConfig.I.sparkleMat, 6);
       if (art && Hp > 0) BroomArt.Trigger(art, "Hurt");
       GameEvents.BossHurt?.Invoke(Hp);
@@ -180,7 +178,7 @@ namespace BroomstickBash {
 
     // Defeat: stagger/shake 1.1 s → topple and fall 0.9 s → poof → 1 s pause → win screen.
     void StartDefeat(){
-      mode = Mode.Defeated; defeatT = 0; poofed = false; ClearTells(); StopAllCoroutines(); SetTint(Color.white);
+      mode = Mode.Defeated; defeatT = 0; poofed = false; ClearTells(); StopAllCoroutines(); SetTint(Color.white, 0.8f);
       foreach (var f in FindObjectsByType<Fireball>(FindObjectsSortMode.None)) Destroy(f.gameObject);
       if (pc) pc.GrantInvulnerability(5f);
       if (art) BroomArt.Trigger(art, "Defeat");
@@ -195,7 +193,7 @@ namespace BroomstickBash {
       if (defeatT < 1.1f){
         transform.position = new Vector3(TargetX + Mathf.Sin(defeatT * 60f) * 0.15f, p.y, 0);
         transform.rotation = Quaternion.Euler(0, 0, Mathf.Sin(defeatT * 25f) * 8f);
-        SetTint(Mathf.Repeat(defeatT * 8f, 1f) < 0.5f ? Color.white : (Color?)null);
+        if (Mathf.Repeat(defeatT * 8f, 1f) < 0.5f) SetTint(Color.white, 0.8f); else SetTint(null);
       } else if (defeatT < 2.0f){
         float k = (defeatT - 1.1f) / 0.9f;
         transform.position = new Vector3(TargetX, Mathf.Lerp(p.y, 0.8f, k), 0); transform.rotation = Quaternion.Euler(0, 0, -80f * k);
@@ -209,12 +207,41 @@ namespace BroomstickBash {
       }
     }
 
-    void SetTint(Color? c){
-      foreach (var r in rends){
-        if (!r) continue;
-        if (c.HasValue){ r.GetPropertyBlock(mpb); mpb.SetColor(BaseColor, c.Value); r.SetPropertyBlock(mpb); }
-        else r.SetPropertyBlock(null);
+    public const float TellBlend = 0.45f;
+    /// <summary>Blends each material slot's own base colour toward <paramref name="c"/> by <paramref name="amount"/> (keeps the art
+    /// readable instead of painting it flat). null clears the override.</summary>
+    void SetTint(Color? c, float amount = 1f){
+      for (int i = 0; i < rends.Length; i++){
+        var r = rends[i]; if (!r) continue;
+        var mats = r.sharedMaterials;
+        for (int m = 0; m < mats.Length; m++){
+          if (!c.HasValue){ mpb.Clear(); r.SetPropertyBlock(mpb, m); continue; }
+          var baseCol = mats[m] && mats[m].HasProperty(BaseColor) ? mats[m].GetColor(BaseColor) : Color.gray;
+          var t = Color.Lerp(baseCol, c.Value, amount); t.a = baseCol.a;
+          mpb.Clear(); mpb.SetColor(BaseColor, t); r.SetPropertyBlock(mpb, m);
+        }
       }
+    }
+
+    // Spell during entry grace: fizzle sparkle on the boss + a short floating "IMMUNE" cue.
+    float immuneCue;
+    void Fizzle(){
+      Puff.Burst(transform.position + new Vector3(-1.2f, 0.4f, -0.5f), GameConfig.I.sparkleMat, 5, 0.1f, 2f);
+      immuneCue = 0.8f; GameEvents.BossImmune?.Invoke();
+    }
+    GUIStyle cueStyle;
+    void OnGUI(){
+      if (immuneCue <= 0) return;
+      immuneCue -= Time.unscaledDeltaTime;
+      var cam0 = Camera.main; if (!cam0) return;
+      var sp = cam0.WorldToScreenPoint(transform.position + Vector3.up * (2.2f + (0.8f - immuneCue) * 0.6f));
+      if (sp.z < 0) return;
+      float sc = Screen.height / 720f;
+      cueStyle ??= new GUIStyle(GUI.skin.label){ alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
+      cueStyle.fontSize = Mathf.RoundToInt(26 * sc);
+      GUI.color = new Color(1f, 0.95f, 0.5f, Mathf.Clamp01(immuneCue / 0.4f));
+      GUI.Label(new Rect(sp.x - 100 * sc, Screen.height - sp.y - 20 * sc, 200 * sc, 40 * sc), "IMMUNE", cueStyle);
+      GUI.color = Color.white;
     }
   }
 }

@@ -27,7 +27,7 @@ namespace BroomstickBash {
       int sub = Mathf.Max(1, Mathf.RoundToInt(DecisionStep / Dt));
       var next = new Dictionary<int, Vector2>();
       while (t < maxT){
-        if (AllPassed(shots, t - telegraph)) return true;
+        if (AllPassed(shots, t, telegraph)) return true;
         next.Clear();
         foreach (var s in states.Values){
           for (int a = 0; a < 2; a++){
@@ -36,7 +36,7 @@ namespace BroomstickBash {
               vy = Mathf.Max(vy - m.gravity * Dt, m.maxFall); y += vy * Dt;
               if (y > top){ y = top; vy = Mathf.Min(vy, 0); }
               if (y < bottom){ dead = true; break; }
-              if (Collides(shots, t + (k + 1) * Dt - telegraph, y, hitR)) dead = true;
+              if (Collides(shots, t + (k + 1) * Dt, telegraph, y, hitR)) dead = true;
             }
             if (!dead) next[Key(y, vy)] = new Vector2(y, vy);
           }
@@ -48,26 +48,85 @@ namespace BroomstickBash {
       return true;
     }
     static int Key(float y, float vy) => Mathf.RoundToInt(y / YBin) * 1000 + Mathf.RoundToInt(vy / VBin) + 500;
-    static Vector2 PosAt(Shot s, float t){
-      float tt = t - s.delay; if (tt < 0) return new Vector2(9999, 0);
+    static Vector2 PosAt(Shot s, float t, float telegraph){
+      float tt = t - (s.live ? 0f : telegraph) - s.delay; if (tt < 0) return new Vector2(9999, 0);
       return s.pos + s.vel * tt + 0.5f * s.gravity * tt * tt * Vector2.down;
     }
-    // witch-frame: the witch sits at x = 0; y here is absolute, shot y is relative to witch's start → stored absolute by caller
-    static bool Collides(List<Shot> shots, float t, float y, float r){
-      if (t < 0) return false;
-      foreach (var s in shots){ var p = PosAt(s, t); float dx = p.x, dy = p.y - y; if (dx * dx + dy * dy < r * r) return true; }
+    // witch-frame: the witch sits at x = 0; shot y is absolute (see ToAbsolute)
+    static bool Collides(List<Shot> shots, float t, float telegraph, float y, float r){
+      foreach (var s in shots){ var p = PosAt(s, t, telegraph); float dx = p.x, dy = p.y - y; if (dx * dx + dy * dy < r * r) return true; }
       return false;
     }
-    static bool AllPassed(List<Shot> shots, float t){
-      if (t < 0) return false;
-      foreach (var s in shots){ var p = PosAt(s, t); if (p.x > -1.5f && p.y > -1f) return false; }
+    static bool AllPassed(List<Shot> shots, float t, float telegraph){
+      if (t < telegraph) return false;
+      foreach (var s in shots){ var p = PosAt(s, t, telegraph); if (p.x > -1.5f && p.y > -1f) return false; }
       return true;
     }
     /// <summary>Converts shots built relative to the witch (pos.y relative) into absolute-y shots for IsFair.</summary>
     public static List<Shot> ToAbsolute(List<Shot> rel, float witchY){
       var o = new List<Shot>(rel.Count);
-      foreach (var s in rel){ var c = s; c.pos.y += witchY; o.Add(c); }
+      foreach (var s in rel){ var c = s; if (!c.live) c.pos.y += witchY; o.Add(c); }
       return o;
+    }
+
+    /// <summary>Shared planner (runtime + tests): builds the attack, drops shots closer than minDist, and checks it TOGETHER with
+    /// the fireballs already in the air (<paramref name="live"/>, absolute y, witch-frame x/vel). Tries 5 variants, then a single
+    /// slow aimed shot; returns null to skip the attack. <paramref name="kind"/> is updated if the fallback is used.</summary>
+    public static List<Shot> PlanFair(ref AttackKind kind, PhaseTuning tun, Vector2 bossRel, float y, float vy, List<Shot> live,
+                                      FlapModel m, System.Random rng, float minDist, out int rejected){
+      rejected = 0;
+      for (int tries = 0; tries < 5; tries++){
+        var rel = FireballPatterns.Build(kind, tun, bossRel, y, m.groundY, m.ceilingY, rng);
+        rel.RemoveAll(s => s.pos.magnitude < minDist);
+        if (rel.Count > 0 && IsFair(Combine(rel, live, y), m, y, vy, tun.telegraph)) return rel;
+        rejected++;
+      }
+      var fb = new PhaseTuning{ fireballSpeed = 3.2f, aimedCount = 1, telegraph = tun.telegraph };
+      var one = FireballPatterns.Build(AttackKind.Aimed, fb, bossRel, y, m.groundY, m.ceilingY, rng);
+      one.RemoveAll(s => s.pos.magnitude < minDist);
+      if (one.Count > 0 && IsFair(Combine(one, live, y), m, y, vy, tun.telegraph)){ kind = AttackKind.Aimed; return one; }
+      return null;
+    }
+    static List<Shot> Combine(List<Shot> rel, List<Shot> live, float y){
+      var all = ToAbsolute(rel, y); if (live != null) all.AddRange(live); return all;
+    }
+
+    /// <summary>Overlap sweep: a previous attack was fired <c>rest</c> seconds ago and its fireballs are still in the air when the
+    /// next one is planned. Checks (a) whatever PlanFair returns is fair with the live fireballs, and counts how often it had to
+    /// adjust or skip. Returns (cases, unfairCommitted, skipped).</summary>
+    public static int OverlapConflictsCaught;
+    public static (int total, int unfair, int skipped) OverlapSweep(PhaseTuning[] phases, FlapModel m, int seeds = 8){
+      int total = 0, bad = 0, skip = 0; OverlapConflictsCaught = 0;
+      for (int p = 0; p < phases.Length; p++)
+        foreach (AttackKind prevK in System.Enum.GetValues(typeof(AttackKind)))
+          foreach (AttackKind k0 in System.Enum.GetValues(typeof(AttackKind)))
+            for (float y0 = 2f; y0 <= 8f; y0 += 2f)
+              for (int s = 0; s < seeds; s++){
+                var rng = new System.Random(s * 104729 + p * 131 + (int)prevK * 17 + (int)k0);
+                var tun = phases[p];
+                float bossY = 2.5f + (float)rng.NextDouble() * 5f;
+                var bossRel = new Vector2(12.5f - 1.6f, bossY + 0.4f - y0);
+                // previous attack, advanced by its telegraph + rest (it has been flying for 'rest' seconds)
+                var prev = ToAbsolute(FireballPatterns.Build(prevK, tun, bossRel, y0, m.groundY, m.ceilingY, rng), y0);
+                var live = new List<Shot>();
+                foreach (var sh in prev){
+                  var c = sh; float tt = tun.rest - c.delay;
+                  if (tt < 0){ c.delay = -tt; tt = 0; } else c.delay = 0;   // not yet launched (staggered arcs)
+                  c.pos += c.vel * tt + 0.5f * c.gravity * tt * tt * Vector2.down; c.vel += c.gravity * tt * Vector2.down; c.live = true;
+                  if (c.pos.x > -1.5f && c.pos.y > -1f) live.Add(c);
+                }
+                total++;
+                // would a plan that ignored the live fireballs have been unfair? (shows the overlap check matters)
+                var naive = FireballPatterns.Build(k0, tun, bossRel, y0, m.groundY, m.ceilingY, new System.Random(s));
+                naive.RemoveAll(q => q.pos.magnitude < 6f);
+                if (naive.Count > 0 && IsFair(ToAbsolute(naive, y0), m, y0, 0f, tun.telegraph) && !IsFair(Combine(naive, live, y0), m, y0, 0f, tun.telegraph)) OverlapConflictsCaught++;
+                var k = k0;
+                var plan = PlanFair(ref k, tun, bossRel, y0, 0f, live, m, rng, 6f, out _);
+                if (plan == null){ skip++; continue; }
+                var all = ToAbsolute(plan, y0); all.AddRange(live);
+                if (!IsFair(all, m, y0, 0f, tun.telegraph)){ bad++; Debug.LogWarning($"[Fairness] UNFAIR overlap phase {p} {prevK}->{k} y0={y0} seed={s}"); }
+              }
+      return (total, bad, skip);
     }
 
     /// <summary>Test-time sweep used by the editor build (BossFairnessTest): every phase x attack x start height x seed.
