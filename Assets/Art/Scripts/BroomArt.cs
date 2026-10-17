@@ -17,7 +17,7 @@ namespace BroomstickBash.Art {
       var p = Load(name); if (!p || !parent) return null;
       if (hidePlaceholder) foreach (var r in parent.GetComponentsInChildren<Renderer>()) r.enabled = false;
       var g = Object.Instantiate(p, parent, false); g.name = "Art_" + name;
-      foreach (var c in g.GetComponentsInChildren<Collider>()) Object.Destroy(c);
+      foreach (var c in g.GetComponentsInChildren<Collider>()){ if (Application.isPlaying) Object.Destroy(c); else Object.DestroyImmediate(c); }
       return g;
     }
     public static void Trigger(GameObject art, string state){ var a = art ? art.GetComponentInChildren<Animator>() : null; if (a) a.SetTrigger(state); }

@@ -4,7 +4,7 @@ namespace BroomstickBash {
   public enum ObstacleKind { Kid, Car, Branch, Bat, Ghost, LampPost } // append only (serialized ints)
   [System.Serializable] public class SpawnEntry {
     public ObstacleKind kind;
-    [Tooltip("Optional prefab (M2 art). If null, ObstacleFactory builds a gray-box version.")] public GameObject prefab;
+    [Tooltip("UNUSED: art is applied by BroomArtSkin (name-based) to avoid double art. Kept for serialization compatibility.")] public GameObject prefab;
     public float weight = 1f;
     [Range(0, 1)] public float minDifficulty = 0f;
     [Tooltip("M1 legacy (SpawnOne only). M2 LevelPlanner picks heights itself so the fairness validator can guarantee a gap; weight/minDifficulty DO gate M2 kinds (Branch weight only enables/disables ceiling templates).")]

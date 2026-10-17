@@ -6,11 +6,6 @@ namespace BroomstickBash {
       GameObject go; ObstacleBase ob;
       if (e.kind == ObstacleKind.LampPost) // M2 kind: build via the planned-item path
         return Create(new PlannedItem{ kind = ObstacleKind.LampPost, y = cfg.groundY, size = Random.Range(3.2f, 5f) }, x, cfg, null);
-      if (e.prefab){
-        go = Object.Instantiate(e.prefab, new Vector3(x, Y(e, cfg), 0), Quaternion.identity);
-        ob = go.GetComponent<ObstacleBase>(); if (!ob) ob = go.AddComponent<ObstacleBase>();
-        ob.kind = e.kind; return ob;
-      }
       switch (e.kind){
         case ObstacleKind.Kid: {
           float h = Random.Range(1.1f, 1.5f);
@@ -51,7 +46,6 @@ namespace BroomstickBash {
     /// <summary>M2: build exactly what LevelPlanner planned (geometry must match PlannedItem.Envelope).</summary>
     public static ObstacleBase Create(PlannedItem p, float x, GameConfig cfg, SpawnTable table){
       x += p.dx; GameObject go; ObstacleBase ob;
-      var entry = table ? table.EntryFor(p.kind) : null;
       float gy = cfg.groundY;
       switch (p.kind){
         case ObstacleKind.Kid: {
@@ -95,11 +89,7 @@ namespace BroomstickBash {
           go.AddComponent<BoxCollider>(); go.layer = Layers.Enemy; var bt = go.AddComponent<Bat>(); bt.amp = p.amp; ob = bt; ob.scoreValue = 15; break;
         }
       }
-      if (entry != null && entry.prefab){ // M2 art hook: hide gray-box renderers, attach art; gray-box colliders keep the validated envelope
-        foreach (var r in go.GetComponentsInChildren<Renderer>()) r.enabled = false;
-        var art = Object.Instantiate(entry.prefab, go.transform, false); art.name = "Art";
-        foreach (var c in art.GetComponentsInChildren<Collider>()) Object.Destroy(c);
-      }
+      // Art: applied by BroomArtSkin (name-based, one instance per root). SpawnEntry.prefab is intentionally not used.
       ob.speed = p.speed; ob.kind = p.kind; return ob;
     }
     static float Y(SpawnEntry e, GameConfig cfg) => e.maxY > e.minY ? Random.Range(e.minY, e.maxY) : (cfg.groundY + cfg.ceilingY) * 0.5f;

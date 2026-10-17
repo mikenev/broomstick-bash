@@ -84,8 +84,10 @@ public static class BuildWeb {
       var lamp = Block(cfg, "Lamp", cfg.cylinder, cfg.houseMat, new Vector3(x + 4.5f, 1.6f, 4f), new Vector3(0.15f, 1.6f, 0.15f), houses.transform);
       Block(cfg, "LampLight", cfg.sphere, windowMat, new Vector3(x + 4.5f, 3.3f, 4f), Vector3.one * 0.4f, lamp.transform);
     }
-    Block(cfg, "Moon", cfg.sphere, Mat("Moon", new Color(1f, 1f, 0.85f), new Color(0.8f, 0.8f, 0.6f)), new Vector3(0, 0, 0), Vector3.one * 6, camGo.transform)
-      .transform.localPosition = new Vector3(14, 8, 60);
+    var grayMoon = Block(cfg, "Moon", cfg.sphere, Mat("Moon", new Color(1f, 1f, 0.85f), new Color(0.8f, 0.8f, 0.6f)), new Vector3(0, 0, 0), Vector3.one * 6, camGo.transform);
+    grayMoon.transform.localPosition = new Vector3(14, 8, 60);
+    var parallax = new GameObject("ParallaxBackground").AddComponent<ParallaxBackground>();
+    parallax.cam = camGo.transform; parallax.grayHouses = houses.gameObject; parallax.grayMoon = grayMoon;
 
     var spawner = new GameObject("Spawner").AddComponent<Spawner>();
     spawner.table = table; spawner.cam = camGo.transform; spawner.player = player.transform;
@@ -235,7 +237,7 @@ public static class BuildWeb {
     // geometry: factory output must stay inside the planner envelopes
     var cfgGo = new GameObject("ValidateCfg"); var cfg = cfgGo.AddComponent<GameConfig>(); GameConfig.I = cfg;
     cfg.cube = Prim(PrimitiveType.Cube); cfg.sphere = Prim(PrimitiveType.Sphere); cfg.cylinder = Prim(PrimitiveType.Cylinder); cfg.capsule = Prim(PrimitiveType.Capsule);
-    var grng = new System.Random(7); var gpl = new LevelPlanner(grng, ground, ceiling); int geo = 0;
+    var grng = new System.Random(7); var gpl = new LevelPlanner(grng, ground, ceiling); int geo = 0, artChecks = 0; var artKinds = new System.Collections.Generic.HashSet<ObstacleKind>();
     for (int i = 0; i < 400; i++){
       var col = gpl.Next((float)grng.NextDouble(), 8f, 99f);
       foreach (var it in col.items){
@@ -246,10 +248,23 @@ public static class BuildWeb {
         if (it.kind == ObstacleKind.Ghost){ minY -= it.amp; maxY += it.amp; }
         if (it.kind == ObstacleKind.Kid) maxY += 0.12f; // bob
         if (minY < e.x - 0.02f || maxY > e.y + 0.02f) Fail($"geometry {it.kind}: colliders y[{minY:0.00},{maxY:0.00}] outside envelope [{e.x:0.00},{e.y:0.00}]");
+        // art: exactly one art instance per obstacle via the single (name-based) path, colliders untouched
+        if (it.kind != ObstacleKind.Branch) ob.transform.rotation = Quaternion.identity; // branch keeps its real spawn tilt
+        Physics.SyncTransforms();
+        var before = new System.Collections.Generic.List<Bounds>(); foreach (var c in ob.GetComponentsInChildren<Collider>()) before.Add(c.bounds);
+        BroomstickBash.Art.BroomArtSkin.Skin(ob.gameObject); Physics.SyncTransforms();
+        int artCount = 0; foreach (Transform tr in ob.transform) if (tr.name.StartsWith("Art_")) artCount++; // direct children = attached art instances
+        var after = ob.GetComponentsInChildren<Collider>();
+        bool same = after.Length == before.Count; for (int ci = 0; same && ci < after.Length; ci++) same = (after[ci].bounds.center - before[ci].center).sqrMagnitude < 1e-6f && (after[ci].bounds.size - before[ci].size).sqrMagnitude < 1e-6f;
+        if (artCount != 1) Fail($"art {it.kind}: {artCount} art instances (expected 1)"); else artChecks++;
+        if (!same) Fail($"art {it.kind}: colliders changed by skinning");
+        artKinds.Add(it.kind);
         geo++; Object.DestroyImmediate(ob.gameObject);
       }
     }
     Object.DestroyImmediate(cfgGo);
+    foreach (ObstacleKind k in System.Enum.GetValues(typeof(ObstacleKind))) if (!artKinds.Contains(k)) Fail($"art: kind {k} never checked");
+    Debug.Log($"VALIDATE ART: {artChecks} obstacles skinned with exactly one art instance, colliders unchanged; kinds={string.Join(",", artKinds)}");
     var sb = new System.Text.StringBuilder();
     foreach (var kv in templates) sb.Append($"{kv.Key}={kv.Value} "); sb.Append("| ");
     foreach (var kv in kinds) sb.Append($"{kv.Key}={kv.Value} ");
