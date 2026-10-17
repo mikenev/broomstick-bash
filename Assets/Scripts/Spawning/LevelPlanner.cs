@@ -16,7 +16,7 @@ namespace BroomstickBash {
         case ObstacleKind.Kid: return new Vector2(groundY, groundY + size + 0.15f);
         case ObstacleKind.Car: return new Vector2(groundY, groundY + LevelPlanner.CarHeight);
         case ObstacleKind.LampPost: return new Vector2(groundY, groundY + size + LevelPlanner.LampHeadR);
-        case ObstacleKind.Branch: return new Vector2(ceilingY - size - 0.3f, ceilingY);
+        case ObstacleKind.Branch: return new Vector2(ceilingY - size - 0.3f, ceilingY + 0.1f); // tilted top pokes above the ceiling (irrelevant to the witch)
         case ObstacleKind.Bat: return new Vector2(y - amp - LevelPlanner.BatHalf, y + LevelPlanner.BatHalf);
         case ObstacleKind.Ghost: return new Vector2(y - amp - LevelPlanner.GhostHalf, y + amp + LevelPlanner.GhostHalf);
       }
@@ -75,12 +75,13 @@ namespace BroomstickBash {
       var wins = Windows(c);
       // drift: a faster column closes on the slower previous one before both pass the witch
       float tPass = (SpawnAhead + PassMargin) / Mathf.Max(1f, scroll);
-      float dxEff = Mathf.Max(0.5f, dx - Mathf.Max(0, MaxSpeed(c) - prevMinSpeed) * tPass);
+      // conservative: assume the previous column may be standing still relative to the street
+      float dxEff = Mathf.Max(0.5f, dx - MaxSpeed(c) * tPass);
       float dt = dxEff / Mathf.Max(1f, scroll + MaxSpeed(c));
       Vector2 reach = hasPrev ? new Vector2(prevSafe.x - FallRate * dt, prevSafe.y + ClimbRate * dt) : new Vector2(-99, 99);
       float bestLen = -1;
       foreach (var w in wins){
-        if (w.y - w.x < MinWindow(d)) continue;
+        if (w.y - w.x < MinWindow(d) + 0.03f) continue;     // small margin over the validator's sampling
         if (w.y < reach.x || w.x > reach.y) continue;                 // not reachable in time
         if (w.y - w.x > bestLen){ bestLen = w.y - w.x; window = w; }
       }

@@ -181,10 +181,11 @@ public static class BuildWeb {
         float lo = ground + LevelPlanner.PlayerMinY, hi = ceiling - LevelPlanner.PlayerMaxOff;
         float runStart = -1, bestLen = 0; Vector2 bestWin = default; bool reachableFound = false;
         float maxSp = 0, prevMinSp = 0; foreach (var it in col.items) maxSp = Mathf.Max(maxSp, it.speed);
-        for (float y = lo; y <= hi + 0.0001f; y += 0.01f){
+        int steps = Mathf.FloorToInt((hi - lo) / 0.01f);
+        for (int si = 0; si <= steps; si++){ float y = lo + si * 0.01f;
           bool free = true;
           foreach (var it in col.items){ var e = it.Envelope(ground, ceiling); if (y + LevelPlanner.PlayerAbove > e.x && y - LevelPlanner.PlayerBelow < e.y){ free = false; break; } }
-          bool end = !free || y + 0.01f > hi + 0.0001f;
+          bool end = !free || si == steps;
           if (free && runStart < 0) runStart = y;
           if (end && runStart >= 0){
             float top = free ? y : y - 0.01f; float len = top - runStart;
