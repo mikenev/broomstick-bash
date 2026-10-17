@@ -182,8 +182,23 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
+      name: OutlineCool
+    second: {fileID: 2100000, guid: 0387094e5976ba4db9e7d8af82c35492, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: OutlineWarm
+    second: {fileID: 2100000, guid: 590fe8869e80bc71283107fa20fc3795, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
       name: Pumpkin
     second: {fileID: 2100000, guid: eb021a4fcaf6664f9be96f03ff37b209, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: PumpkinBG
+    second: {fileID: 2100000, guid: 99a02076bbd098fc6950f65aeb236f86, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
@@ -254,6 +269,11 @@ ModelImporter:
       assembly: UnityEngine.CoreModule
       name: Stem
     second: {fileID: 2100000, guid: deb641252ffd7db2482cfe813fbb7a64, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: StemBG
+    second: {fileID: 2100000, guid: cde52abe3acc6a0e19c84e857e28d0fe, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
