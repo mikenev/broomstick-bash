@@ -14,22 +14,24 @@ namespace BroomstickBash {
     const float MoonFollow = 0.95f;
     void Start(){
       if (!cam && Camera.main) cam = Camera.main.transform;
-      if (!BroomArt.Load("BG_HousesFar")) return; // keep gray-box
+      // all-or-nothing on the full set so a half-imported art pass never leaves an empty layer
+      foreach (var n in new[]{ "BG_HousesFar", "BG_HousesNear", "BG_Pumpkins", "BG_Moon" }) if (!BroomArt.Load(n)) return; // keep gray-box
       if (grayHouses) grayHouses.SetActive(false);
       if (grayMoon) grayMoon.SetActive(false);
       layers = new[]{ Make("BG_HousesFar", 28f, 0.6f), Make("BG_HousesNear", 12f, 0.35f), Make("BG_Pumpkins", 3f, 0f) };
       var m = BroomArt.Load("BG_Moon");
-      if (m){ moon = Instantiate(m, transform, false).transform; moon.name = "Art_BG_Moon"; }
+      if (m){ moon = Instantiate(m, transform, false).transform; moon.name = "Art_BG_Moon"; StripColliders(moon); }
       LateUpdate();
     }
     Layer Make(string name, float z, float follow){
       var p = BroomArt.Load(name); var l = new Layer{ follow = follow, tiles = new Transform[p ? 3 : 0] };
       for (int i = 0; i < l.tiles.Length; i++){
         var t = Instantiate(p, transform, false).transform; t.name = $"Art_{name}_{i}";
-        t.position = new Vector3(i * BroomArt.LayerWidth, 0, z); l.tiles[i] = t;
+        t.position = new Vector3(i * BroomArt.LayerWidth, 0, z); l.tiles[i] = t; StripColliders(t);
       }
       return l;
     }
+    static void StripColliders(Transform t){ foreach (var c in t.GetComponentsInChildren<Collider>()) Destroy(c); } // same convention as BroomArt.Attach
     void LateUpdate(){
       if (layers == null || !cam) return;
       float cx = cam.position.x, W = BroomArt.LayerWidth;

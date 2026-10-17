@@ -231,10 +231,11 @@ public static class BuildWeb {
         if (it.kind == ObstacleKind.Kid) maxY += 0.12f; // bob
         if (minY < e.x - 0.02f || maxY > e.y + 0.02f) Fail($"geometry {it.kind}: colliders y[{minY:0.00},{maxY:0.00}] outside envelope [{e.x:0.00},{e.y:0.00}]");
         // art: exactly one art instance per obstacle via the single (name-based) path, colliders untouched
-        ob.transform.rotation = Quaternion.identity; Physics.SyncTransforms();
+        if (it.kind != ObstacleKind.Branch) ob.transform.rotation = Quaternion.identity; // branch keeps its real spawn tilt
+        Physics.SyncTransforms();
         var before = new System.Collections.Generic.List<Bounds>(); foreach (var c in ob.GetComponentsInChildren<Collider>()) before.Add(c.bounds);
         BroomstickBash.Art.BroomArtSkin.Skin(ob.gameObject); Physics.SyncTransforms();
-        int artCount = 0; foreach (Transform tr in ob.GetComponentsInChildren<Transform>(true)) if (tr.name.StartsWith("Art_")) artCount++;
+        int artCount = 0; foreach (Transform tr in ob.transform) if (tr.name.StartsWith("Art_")) artCount++; // direct children = attached art instances
         var after = ob.GetComponentsInChildren<Collider>();
         bool same = after.Length == before.Count; for (int ci = 0; same && ci < after.Length; ci++) same = (after[ci].bounds.center - before[ci].center).sqrMagnitude < 1e-6f && (after[ci].bounds.size - before[ci].size).sqrMagnitude < 1e-6f;
         if (artCount != 1) Fail($"art {it.kind}: {artCount} art instances (expected 1)"); else artChecks++;
