@@ -26,6 +26,7 @@ namespace BroomstickBash {
     public void ResetRun(){
       foreach (var f in FindObjectsByType<Fireball>(FindObjectsSortMode.None)) Destroy(f.gameObject);
       foreach (var s in FindObjectsByType<Spell>(FindObjectsSortMode.None)) Destroy(s.gameObject);
+      foreach (var pf in FindObjectsByType<Puff>(FindObjectsSortMode.None)) Destroy(pf.gameObject); // playtest: clear puffs on reset
       player.ResetPlayer(); spawner.ResetSpawner(); boss.gameObject.SetActive(false);
       Distance = 0; Kills = 0; KillScore = 0; newHigh = false; State = GameState.Ready;
       GameEvents.RunReset?.Invoke();
@@ -36,8 +37,11 @@ namespace BroomstickBash {
       if (State != GameState.Playing) return;
       State = GameState.Boss; spawner.spawning = false; spawner.ClearAll(true); boss.Begin();
     }
-    public void GameOver(){ if (!IsActive) return; State = GameState.GameOver; End(); GameEvents.GameOver?.Invoke(); }
-    public void Win(){ if (State != GameState.Boss) return; KillScore += 500; State = GameState.Win; End(); }
+    public void GameOver(){ if (!IsActive) return; State = GameState.GameOver; End(); GameEvents.GameOver?.Invoke(); GameEvents.RunEnded?.Invoke(false, Score); }
+    public void Win(){ if (State != GameState.Boss) return; KillScore += 500; State = GameState.Win; End(); GameEvents.Won?.Invoke(Score); GameEvents.RunEnded?.Invoke(true, Score); }
+    /// <summary>Playtest fix: restarting from game over / win (flap or R) goes straight into a new run instead of the title.
+    /// The caller returns before player.Tick, so the restarting flap is applied exactly once.</summary>
+    void Restart(){ ResetRun(); State = GameState.Playing; player.Flap(); }
     void End(){
       endTime = Time.unscaledTime;
       if (Score > HighScore){ HighScore = Score; newHigh = true; PlayerPrefs.SetInt(HighKey, Score); PlayerPrefs.Save(); }
@@ -45,10 +49,11 @@ namespace BroomstickBash {
     void Update(){
       var kb = Keyboard.current;
       if (kb != null && kb.bKey.wasPressedThisFrame) StartBoss();          // debug/QA: jump to boss
-      if (kb != null && kb.rKey.wasPressedThisFrame && State != GameState.Ready){ ResetRun(); return; }
+      bool ended = State == GameState.GameOver || State == GameState.Win;
+      if (kb != null && kb.rKey.wasPressedThisFrame && State != GameState.Ready){ if (ended) Restart(); else ResetRun(); return; }
       if (State == GameState.Ready){ if (PlayerController.FlapPressed()) StartRun(); return; }
-      if (State == GameState.GameOver || State == GameState.Win){
-        if (Time.unscaledTime - endTime > 0.6f && PlayerController.FlapPressed()) ResetRun();
+      if (ended){
+        if (Time.unscaledTime - endTime > 0.6f && PlayerController.FlapPressed()) Restart();
         return;
       }
       float dt = Time.deltaTime, v = ScrollSpeed;
@@ -74,7 +79,13 @@ namespace BroomstickBash {
       GUI.color = Color.white;
       GUI.Label(new Rect(20*s, 58*s, 700*s, 34*s), $"Score: {Score}   ({Mathf.FloorToInt(Distance)} m + {Kills} spooks)", small);
       GUI.Label(new Rect(20*s, 88*s, 700*s, 34*s), $"Best: {HighScore}", small);
-      GUI.Label(new Rect(20*s, 118*s, 700*s, 34*s), player.CooldownLeft > 0 ? "Spell: recharging" : "Spell: READY (X / F / right-click)", small);
+      // spell cooldown meter
+      float frac = player.castCooldown > 0 ? 1f - Mathf.Clamp01(player.CooldownLeft / player.castCooldown) : 1f;
+      GUI.Label(new Rect(20*s, 118*s, 120*s, 34*s), "Spell", small);
+      GUI.color = new Color(0, 0, 0, 0.6f); GUI.DrawTexture(new Rect(95*s, 126*s, 160*s, 16*s), white);
+      GUI.color = frac >= 1f ? new Color(0.6f, 1f, 0.4f) : new Color(0.45f, 0.55f, 0.4f); GUI.DrawTexture(new Rect(95*s, 126*s, 160*s * frac, 16*s), white);
+      GUI.color = Color.white;
+      if (frac >= 1f) GUI.Label(new Rect(265*s, 118*s, 400*s, 34*s), "READY (X / F / right-click)", small);
       if (State == GameState.Boss){
         float w = 400 * s, x = (Screen.width - w) / 2;
         GUI.color = new Color(0, 0, 0, 0.6f); GUI.DrawTexture(new Rect(x, 20*s, w, 22*s), white);

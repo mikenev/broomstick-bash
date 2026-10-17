@@ -22,6 +22,7 @@ public static class BuildWeb {
     EnsureURP();
     var table = AssetDatabase.LoadAssetAtPath<SpawnTable>(TablePath);
     if (!table){ table = SpawnTable.CreateDefault(); AssetDatabase.CreateAsset(table, TablePath); AssetDatabase.SaveAssets(); }
+    EnsureM2Table(table);
 
     var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
     RenderSettings.ambientMode = AmbientMode.Flat; RenderSettings.ambientLight = new Color(0.32f, 0.27f, 0.45f);
@@ -139,6 +140,109 @@ public static class BuildWeb {
     if (emission.HasValue){ m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", emission.Value); m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None; }
     EditorUtility.SetDirty(m);
     return m;
+  }
+
+
+  /// <summary>M2: make sure the saved table has the LampPost entry and the M2 difficulty/speed/interval curves (keeps any art prefabs).</summary>
+  static void EnsureM2Table(SpawnTable table){
+    // applied once (version-gated) so later Inspector tuning is not clobbered by rebuilds
+    if (table.m2TuningVersion >= 1) return;
+    if (table.EntryFor(ObstacleKind.LampPost) == null) table.entries.Add(new SpawnEntry{ kind = ObstacleKind.LampPost, weight = 1.5f });
+    SpawnTable.ApplyM2Curve(table); EditorUtility.SetDirty(table); AssetDatabase.SaveAssets();
+  }
+
+  /// <summary>Fairness validator. Usage: Unity -batchmode -nographics -projectPath . -executeMethod BuildWeb.ValidatePatterns -logFile v.log
+  /// Simulates whole levels (spawn timer, difficulty/speed curves) for many seeds and independently re-checks every planned
+  /// column: a flappable window >= MinWindow(d) exists (brute-force sampling of envelopes), and it is reachable from the
+  /// previous column's window. Also checks factory geometry stays inside the planner envelopes, and reports the curve.</summary>
+  [MenuItem("Broomstick Bash/Validate Patterns")]
+  public static void ValidatePatterns(){
+    int fails = 0; void Fail(string m){ fails++; if (fails <= 25) Debug.LogError("VALIDATE FAIL: " + m); }
+    var table = AssetDatabase.LoadAssetAtPath<SpawnTable>(TablePath);
+    if (!table){ table = SpawnTable.CreateDefault(); } else EnsureM2Table(table);
+    const float ground = 0f, ceiling = 10f, baseSpeed = 6f, dt = 1f / 60f; const int Seeds = 500;
+    int columns = 0, fallbacks = 0, items = 0; float minWindowSeen = 99, minSlack = 99;
+    var templates = new System.Collections.Generic.Dictionary<string, int>(); var kinds = new System.Collections.Generic.Dictionary<ObstacleKind, int>();
+    float levelTime = 0, fullAt = -1;
+    for (int seed = 0; seed < Seeds; seed++){
+      var rng = new System.Random(seed); var pl = new LevelPlanner(rng, ground, ceiling){ table = table };
+      float dist = 0, t = 0, timer = 1.5f, lastSpawn = 0; Vector2 prevWin = default; bool hasPrev = false;
+      while (dist < table.bossDistance){
+        float d = Spawner.DifficultyAt(table, dist), v = baseSpeed * table.speedByDifficulty.Evaluate(d);
+        if (seed == 0 && fullAt < 0 && d >= 0.999f) fullAt = t;
+        dist += v * dt; t += dt;
+        if (dist > table.bossDistance - LevelPlanner.SpawnAhead) continue;
+        timer -= dt; if (timer > 0) continue;
+        float dx = lastSpawn > 0 ? dist - lastSpawn : 99f; lastSpawn = dist;
+        var col = pl.Next(d, v, dx);
+        timer = table.intervalByDifficulty.Evaluate(d) * (0.9f + 0.2f * (float)rng.NextDouble());
+        columns++; items += col.items.Count; if (col.template == "fallback") fallbacks++;
+        templates[col.template ?? "?"] = templates.TryGetValue(col.template ?? "?", out var tc) ? tc + 1 : 1;
+        foreach (var it in col.items) kinds[it.kind] = kinds.TryGetValue(it.kind, out var kc) ? kc + 1 : 1;
+        // independent window check: sample witch centre heights, free if no envelope (+witch extents) covers it
+        float lo = ground + LevelPlanner.PlayerMinY, hi = ceiling - LevelPlanner.PlayerMaxOff;
+        float runStart = -1, bestLen = 0; Vector2 bestWin = default; bool reachableFound = false;
+        float maxSp = 0, prevMinSp = 0; foreach (var it in col.items) maxSp = Mathf.Max(maxSp, it.speed);
+        int steps = Mathf.FloorToInt((hi - lo) / 0.01f);
+        for (int si = 0; si <= steps; si++){ float y = lo + si * 0.01f;
+          bool free = true;
+          foreach (var it in col.items){ var e = it.Envelope(ground, ceiling); if (y + LevelPlanner.PlayerAbove > e.x && y - LevelPlanner.PlayerBelow < e.y){ free = false; break; } }
+          bool end = !free || si == steps;
+          if (free && runStart < 0) runStart = y;
+          if (end && runStart >= 0){
+            float top = free ? y : y - 0.01f; float len = top - runStart;
+            if (len + 0.011f >= LevelPlanner.MinWindow(d)){
+              bool reach = !hasPrev || (top >= prevWin.x - 0.05f - LevelPlanner.FallRate * 3f && runStart <= prevWin.y + 0.05f + LevelPlanner.ClimbRate * 3f);
+              if (reach && len > bestLen){ bestLen = len; bestWin = new Vector2(runStart, top); reachableFound = true; }
+            }
+            runStart = -1;
+          }
+        }
+        if (!reachableFound) Fail($"seed {seed} t={t:0.0}s d={d:0.00}: no flappable window >= {LevelPlanner.MinWindow(d):0.00} m ({col.template})");
+        else {
+          minWindowSeen = Mathf.Min(minWindowSeen, bestLen); minSlack = Mathf.Min(minSlack, bestLen - LevelPlanner.MinWindow(d));
+          // the planner's chosen window must be real (inside a sampled free run) and overlap the reach band from the previous one
+          if (col.safe.y - col.safe.x + 0.02f < LevelPlanner.MinWindow(d)) Fail($"seed {seed}: planner window too small {col.safe}");
+          if (hasPrev){
+            float tPass = (LevelPlanner.SpawnAhead + LevelPlanner.PassMargin) / v;
+            float dxEff = Mathf.Max(0.5f, dx - maxSp * tPass); float dtc = dxEff / (v + maxSp);
+            if (col.safe.y < prevWin.x - LevelPlanner.FallRate * dtc - 0.01f || col.safe.x > prevWin.y + LevelPlanner.ClimbRate * dtc + 0.01f)
+              Fail($"seed {seed} t={t:0.0}s: window {col.safe} unreachable from {prevWin} in {dtc:0.00}s");
+          }
+        }
+        prevWin = col.safe; hasPrev = true;
+      }
+      if (seed == 0) levelTime = t;
+    }
+    // geometry: factory output must stay inside the planner envelopes
+    var cfgGo = new GameObject("ValidateCfg"); var cfg = cfgGo.AddComponent<GameConfig>(); GameConfig.I = cfg;
+    cfg.cube = Prim(PrimitiveType.Cube); cfg.sphere = Prim(PrimitiveType.Sphere); cfg.cylinder = Prim(PrimitiveType.Cylinder); cfg.capsule = Prim(PrimitiveType.Capsule);
+    var grng = new System.Random(7); var gpl = new LevelPlanner(grng, ground, ceiling); int geo = 0;
+    for (int i = 0; i < 400; i++){
+      var col = gpl.Next((float)grng.NextDouble(), 8f, 99f);
+      foreach (var it in col.items){
+        var ob = ObstacleFactory.Create(it, 0, cfg, null);
+        var e = it.Envelope(ground, ceiling); float minY = 99, maxY = -99;
+        foreach (var c in ob.GetComponentsInChildren<Collider>()){ minY = Mathf.Min(minY, c.bounds.min.y); maxY = Mathf.Max(maxY, c.bounds.max.y); }
+        if (it.kind == ObstacleKind.Bat){ ob.transform.rotation = Quaternion.Euler(0, 0, 20); Physics.SyncTransforms(); foreach (var c in ob.GetComponentsInChildren<Collider>()){ maxY = Mathf.Max(maxY, c.bounds.max.y); minY = Mathf.Min(minY, c.bounds.min.y - it.amp); } }
+        if (it.kind == ObstacleKind.Ghost){ minY -= it.amp; maxY += it.amp; }
+        if (it.kind == ObstacleKind.Kid) maxY += 0.12f; // bob
+        if (minY < e.x - 0.02f || maxY > e.y + 0.02f) Fail($"geometry {it.kind}: colliders y[{minY:0.00},{maxY:0.00}] outside envelope [{e.x:0.00},{e.y:0.00}]");
+        geo++; Object.DestroyImmediate(ob.gameObject);
+      }
+    }
+    Object.DestroyImmediate(cfgGo);
+    var sb = new System.Text.StringBuilder();
+    foreach (var kv in templates) sb.Append($"{kv.Key}={kv.Value} "); sb.Append("| ");
+    foreach (var kv in kinds) sb.Append($"{kv.Key}={kv.Value} ");
+    var curve = new System.Text.StringBuilder();
+    foreach (var p in new[]{ 0f, 0.25f, 0.4f, 0.48f, 0.6f, 0.68f, 0.76f, 0.85f, 1f }){
+      float dd = Spawner.DifficultyAt(table, p * table.bossDistance);
+      curve.Append($"{p:P0}: d={dd:0.00} speed={baseSpeed * table.speedByDifficulty.Evaluate(dd):0.0} interval={table.intervalByDifficulty.Evaluate(dd):0.00}s; ");
+    }
+    Debug.Log($"VALIDATE CURVE: boss at {table.bossDistance} m, reached after {levelTime:0.0}s; full difficulty at {fullAt:0.0}s ({levelTime - fullAt:0.0}s of full difficulty before boss). {curve}");
+    Debug.Log($"VALIDATE RESULT: {(fails == 0 ? "PASS" : "FAIL")} fails={fails} seeds={Seeds} columns={columns} items={items} fallbacks={fallbacks} minWindow={minWindowSeen:0.00}m minSlack={minSlack:0.00}m geometryChecks={geo} [{sb}]");
+    if (Application.isBatchMode) EditorApplication.Exit(fails == 0 ? 0 : 1);
   }
 
   [MenuItem("Broomstick Bash/Build WebGL to docs")]

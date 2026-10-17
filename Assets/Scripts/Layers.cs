@@ -13,6 +13,10 @@ namespace BroomstickBash {
     public static System.Action<int> PlayerHit;        // hearts left
     public static System.Action<ObstacleBase> EnemyKilled;
     public static System.Action BossStarted, BossDefeated, GameOver, RunReset;
-    public static void Clear(){ PlayerHit = null; EnemyKilled = null; BossStarted = BossDefeated = GameOver = RunReset = null; }
+    /// <summary>M2: fired once when the run is won (boss defeated), with the final score. GameOver stays loss-only.</summary>
+    public static System.Action<int> Won;
+    /// <summary>M2: fired once at the end of every run: (won, finalScore). Use this for end-of-run audio/UI (M6).</summary>
+    public static System.Action<bool, int> RunEnded;
+    public static void Clear(){ PlayerHit = null; EnemyKilled = null; BossStarted = BossDefeated = GameOver = RunReset = null; Won = null; RunEnded = null; }
   }
 }
