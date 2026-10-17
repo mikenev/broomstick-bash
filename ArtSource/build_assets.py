@@ -10,14 +10,14 @@ PAL = {  # flat Halloween-night palette (shared with the Unity material remap). 
  "Hair":(0.85,0.30,0.10),"Broom":(0.45,0.28,0.12),"Straw":(0.90,0.72,0.30),"Boot":(0.10,0.08,0.10),"Stripe":(0.95,0.55,0.10),
  "Pumpkin":(0.95,0.45,0.05),"PumpkinDark":(0.70,0.28,0.03),"Stem":(0.25,0.45,0.12),"Sheet":(0.93,0.92,0.88),"Cardboard":(0.72,0.55,0.32),
  "Metal":(0.62,0.66,0.72),"Shoe":(0.85,0.15,0.15),"ShoeBlue":(0.15,0.35,0.85),"Candy":(0.95,0.75,0.10),"Jeans":(0.20,0.30,0.55),
- "Black":(0.05,0.05,0.07),"BatWing":(0.22,0.12,0.30),"GhostBody":(0.40,0.95,0.85),"EyeGlow":(0.70,1.0,0.30),"Fur":(0.35,0.30,0.32),
+ "Black":(0.05,0.05,0.07),"BatWing":(0.22,0.12,0.30),"GhostBody":(0.58,1.0,0.93),"EyeGlow":(0.70,1.0,0.30),"Fur":(0.35,0.30,0.32),
  "FurDark":(0.20,0.17,0.20),"Claw":(0.92,0.90,0.80),"Shorts":(0.35,0.18,0.45),"Tooth":(0.95,0.95,0.90),"Tongue":(0.80,0.25,0.35),
  "CarRed":(0.70,0.12,0.15),"CarTeal":(0.10,0.45,0.50),"Glass":(0.25,0.35,0.55),"Tire":(0.08,0.08,0.09),"LightGlow":(1.0,0.85,0.45),
  "Bark":(0.22,0.15,0.12),"BarkDark":(0.14,0.10,0.09),"LeafOrange":(0.85,0.40,0.08),"Lamp":(0.18,0.18,0.22),
- "HouseA":(0.28,0.22,0.40),"HouseB":(0.22,0.26,0.42),"HouseC":(0.35,0.20,0.30),"Roof":(0.12,0.10,0.18),"WindowGlow":(1.0,0.70,0.25),
- "FarHouse":(0.14,0.12,0.26),"Moon":(0.95,0.93,0.75),"MoonCrater":(0.80,0.78,0.62),"Cloud":(0.30,0.32,0.50),"Fence":(0.18,0.14,0.20),
- "PumpkinGlow":(1.0,0.75,0.20),"SpellGlow":(0.75,0.40,1.0),"SparkleGlow":(1.0,0.95,0.55),"FireGlow":(1.0,0.45,0.08),"FireCore":(1.0,0.85,0.30),
- "Grass":(0.12,0.20,0.16),"Gold":(1.0,0.76,0.15),
+ "HouseA":(0.17,0.17,0.27),"HouseB":(0.14,0.16,0.27),"HouseC":(0.19,0.16,0.26),"Roof":(0.08,0.08,0.14),"WindowGlow":(0.55,0.46,0.34),
+ "FarHouse":(0.09,0.09,0.18),"Moon":(0.95,0.93,0.75),"MoonCrater":(0.80,0.78,0.62),"Cloud":(0.20,0.22,0.36),"Fence":(0.10,0.10,0.16),
+ "PumpkinGlow":(0.62,0.42,0.20),"PumpkinBG":(0.42,0.24,0.12),"StemBG":(0.14,0.20,0.12),"SpellGlow":(0.75,0.40,1.0),"SparkleGlow":(1.0,0.95,0.55),"FireGlow":(1.0,0.45,0.08),"FireCore":(1.0,0.85,0.30),
+ "Grass":(0.08,0.11,0.14),"OutlineWarm":(1.0,0.82,0.50),"OutlineCool":(0.70,0.95,1.0),"Gold":(1.0,0.76,0.15),
 }
 def mat(n):
     m = bpy.data.materials.get(n)
@@ -26,7 +26,12 @@ def mat(n):
         b = m.node_tree.nodes["Principled BSDF"]; c = PAL[n]
         b.inputs["Base Color"].default_value = (*c, 1); b.inputs["Roughness"].default_value = 0.8
         if n.endswith("Glow"): b.inputs["Emission Color"].default_value = (*c, 1); b.inputs["Emission Strength"].default_value = 2.0
-        if n == "GhostBody": b.inputs["Alpha"].default_value = 0.55; m.blend_method = "BLEND"
+        if n.startswith("Outline"):  # preview-only node setup: hide back-facing hull faces (= Unity Cull Back), so only the rim behind the model shows
+            nt = m.node_tree; out = nt.nodes["Material Output"]; em = nt.nodes.new("ShaderNodeEmission"); em.inputs[0].default_value = (*c, 1)
+            tr = nt.nodes.new("ShaderNodeBsdfTransparent"); mx = nt.nodes.new("ShaderNodeMixShader"); geo = nt.nodes.new("ShaderNodeNewGeometry")
+            nt.links.new(geo.outputs["Backfacing"], mx.inputs[0]); nt.links.new(em.outputs[0], mx.inputs[1]); nt.links.new(tr.outputs[0], mx.inputs[2])
+            nt.links.new(mx.outputs[0], out.inputs[0]); m.use_backface_culling = True
+        if n == "GhostBody": b.inputs["Alpha"].default_value = 0.8; m.blend_method = "BLEND"
         m.diffuse_color = (*c, 1)
     return m
 def reset():
@@ -55,7 +60,21 @@ class Builder:
         s.groups.append((bone, list(range(off, len(s.bm.verts)))))
         # from_mesh resets material indices? keep explicit
         return s
-    def build(s):
+    def build(s, outline=None):
+        if outline:  # inverted hull: duplicate the shell, push it out along vertex normals, flip it, give it the outline material
+            omat, th = outline; mi = s._mi(omat)
+            s.bm.verts.ensure_lookup_table(); s.bm.normal_update()
+            orig = list(s.bm.verts); norms = [v.normal.copy() for v in orig]
+            ret = bmesh.ops.duplicate(s.bm, geom=orig + list(s.bm.edges) + list(s.bm.faces))
+            vmap = ret["vert_map"]; newf = [e for e in ret["geom"] if isinstance(e, bmesh.types.BMFace)]
+            for v, n in zip(orig, norms): vmap[v].co += n * th
+            bmesh.ops.reverse_faces(s.bm, faces=newf)
+            for f in newf: f.material_index = mi
+            s.bm.verts.ensure_lookup_table(); s.bm.verts.index_update()
+            extra = []
+            for bone, idx in s.groups:
+                if bone: extra.append((bone, [vmap[orig[k]].index for k in idx]))
+            s.groups += extra
         me = bpy.data.meshes.new(s.name); s.bm.to_mesh(me)
         ob = bpy.data.objects.new(s.name, me); bpy.context.scene.collection.objects.link(ob)
         for m in s.mats: me.materials.append(mat(m))
@@ -147,7 +166,7 @@ def witch():
     b.add("box","RobeDark",(-0.18,0,0.24),(0.06,0.34,0.40),rot=(0,-30,0),bone="Cape")
     b.add("sphere","SpellGlow",(0.22,-0.17,0.12),(0.05,0.05,0.05),bone="ArmF")  # wand spark
     b.add("cyl","Broom",(0.20,-0.16,0.14),(0.02,0.02,0.18),rot=(0,60,0),seg=4,bone="ArmF")
-    ob = b.build(); skin(ob, arm); stat("Witch", b)
+    ob = b.build(outline=("OutlineWarm",0.022)); skin(ob, arm); stat("Witch", b)
     fly = lambda u: {"Root":{"r":(0,0,0),"l":(0,0.06*u,0)},"Cape":(0,0,25+15*u),"Hat":(0,0,5+6*u),"Broom":(0,0,-3*u),"ArmB":(0,0,-10),"ArmF":(0,0,-10)}
     action(arm,"Fly",(1,25),{1:fly(-1),7:fly(0),13:fly(1),19:fly(0),25:fly(-1)})
     flap = {"Root":{"r":(0,0,8),"l":(0,0.12,0)},"Cape":(0,0,60),"Hat":(0,0,20),"Broom":(0,0,-12),"ArmF":(0,0,-20),"ArmB":(0,0,-20)}
@@ -207,12 +226,15 @@ def bat():
     b.add("sphere","Black",(0,0,0.05),(0.20,0.16,0.20),bone="Body"); b.add("sphere","Black",(0.10,0,0.14),(0.14,0.13,0.13),bone="Body")
     for y in (-0.04,0.04):
         b.add("cone","Black",(0.10,y,0.23),(0.05,0.05,0.08),seg=4,bone="Body"); b.add("box","EyeGlow",(0.17,y,0.15),(0.02,0.025,0.025),bone="Body")
-    for bn,s in (("WingF",-1),("WingB",1)):
-        b.add("box","BatWing",(0,s*0.25,0.06),(0.22,0.36,0.015),bone=bn); b.add("cone","BatWing",(-0.08,s*0.36,0.0),(0.10,0.12,0.015),rot=(0,0,0),seg=3,bone=bn)
-    ob=b.build(); skin(ob,arm); stat("Bat",b)
+    for bn,sg in (("WingF",-1),("WingB",1)):
+        b.add("box","BatWing",(-0.03,sg*0.25,0.06),(0.34,0.40,0.015),bone=bn)
+        for k in range(3): b.add("cone","BatWing",(-0.20,sg*(0.12+0.13*k),0.06),(0.10,0.12,0.015),rot=(0,0,90),seg=3,bone=bn)  # scallops
+        b.add("cone","BatWing",(0.10,sg*0.47,0.06),(0.06,0.10,0.015),rot=(0,0,0),seg=3,bone=bn)  # wing claw tip
+    ob=b.build(outline=("OutlineCool",0.018)); skin(ob,arm); stat("Bat",b)
     # wings point sideways (bone Y = +-world Y); flap = rotate about local X? use bone-local Z swing which here is world X axis roll
     up={"WingF":(0,0,0),"WingB":(0,0,0),"Body":{"r":(0,0,0),"l":(0,0,0)}}
-    action(arm,"Flap",(1,9),{1:{"WingF":(35,0,0),"WingB":(-35,0,0),"Body":{"r":(0,0,0),"l":(0,-0.03,0)}},5:{"WingF":(-30,0,0),"WingB":(30,0,0),"Body":{"r":(0,0,0),"l":(0,0.03,0)}},9:{"WingF":(35,0,0),"WingB":(-35,0,0),"Body":{"r":(0,0,0),"l":(0,-0.03,0)}}})
+    up_={"WingF":(-78,0,-12),"WingB":(78,0,12),"Body":{"r":(0,0,0),"l":(0,0.03,0)}}; dn_={"WingF":(-5,0,-12),"WingB":(5,0,12),"Body":{"r":(0,0,0),"l":(0,-0.03,0)}}
+    action(arm,"Flap",(1,9),{1:up_,5:dn_,9:up_})  # wings sweep between near-vertical (reads as a V silhouette from the side) and level
     export("Bat",[arm,ob])
 
 def ghost():
@@ -224,7 +246,7 @@ def ghost():
     for y in (-0.12,0.12): b.add("sphere","EyeGlow",(0.27,y,0.52),(0.10,0.06,0.14),bone="Body")
     b.add("sphere","Black",(0.29,0,0.30),(0.08,0.16,0.10),bone="Body")
     for y in (-0.33,0.33): b.add("cone","GhostBody",(0.05,y,0.25),(0.14,0.14,0.22),rot=(70 if y<0 else -70,0,0),seg=4,bone="Body")
-    ob=b.build(); skin(ob,arm); stat("Ghost",b)
+    ob=b.build(outline=("OutlineCool",0.025)); skin(ob,arm); stat("Ghost",b)
     f=lambda u:{"Body":{"r":(0,0,-6*u),"l":(0,0.12*u,0)},"Tail":(0,0,15*u)}
     action(arm,"Float",(1,41),{1:f(-1),11:f(0),21:f(1),31:f(0),41:f(-1)})
     export("Ghost",[arm,ob])
@@ -287,7 +309,7 @@ def background():
     b.add("box","Fence",(0,0.3,0.85),(W,0.05,0.10)); b.add("box","Fence",(0,0.3,0.40),(W,0.05,0.10))
     for i in range(7):
         px=-W/2+3+i*5.5+random.uniform(-1,1); s=random.uniform(0.5,0.8)
-        b.add("sphere","Pumpkin",(px,-0.2,0.2+s*0.4),(s,s*0.9,s*0.8)); b.add("cyl","Stem",(px,-0.2,0.2+s*0.82),(0.08,0.08,0.15),seg=5)
+        b.add("sphere","PumpkinBG",(px,-0.2,0.2+s*0.4),(s,s*0.9,s*0.8)); b.add("cyl","StemBG",(px,-0.2,0.2+s*0.82),(0.08,0.08,0.15),seg=5)
         for dx in (-0.12*s,0.12*s): b.add("cone","PumpkinGlow",(px+dx,-0.2-s*0.44,0.2+s*0.48),(0.14*s,0.02,0.14*s),rot=(90,0,0),seg=3)
         b.add("box","PumpkinGlow",(px,-0.2-s*0.44,0.2+s*0.28),(0.36*s,0.02,0.06*s))
     ob=b.build(); stat("BG_Pumpkins",b); export("BG_Pumpkins",[ob])
@@ -313,7 +335,7 @@ def boss():
     for bn,y in (("LegF",-0.22),("LegB",0.22)):
         b.add("box","Fur",(0.05,y,0.60),(0.28,0.28,0.80),bone=bn); b.add("box","FurDark",(0.18,y,0.08),(0.45,0.26,0.16),bone=bn)
     b.add("cone","Fur",(-0.45,0,1.15),(0.22,0.22,0.6),rot=(0,-120,0),seg=5,bone="Hips")  # tail
-    ob=b.build(); skin(ob,arm); stat("Werewolf",b)
+    ob=b.build(outline=("OutlineWarm",0.035)); skin(ob,arm); stat("Werewolf",b)
     idle=lambda u:{"Chest":(0,0,-3*u),"Head":(0,0,4*u),"Jaw":(0,0,3+3*u),"ArmF":(0,0,6*u),"ArmB":(0,0,-6*u),"Hips":{"r":(0,0,0),"l":(0,0.03*u,0)}}
     action(arm,"Idle",(1,41),{1:idle(-1),21:idle(1),41:idle(-1)})
     wind={"ArmF":(0,0,150),"Chest":(0,0,15),"Head":(0,0,-5),"Jaw":(0,0,0),"Hips":{"r":(0,0,0),"l":(0,0,0)}}
