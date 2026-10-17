@@ -35,7 +35,7 @@ public static class BuildWeb {
     cfg.branchMat = Mat("Branch", new Color(0.3f, 0.2f, 0.12f));
     cfg.batMat = Mat("Bat", new Color(0.12f, 0.1f, 0.14f));
     cfg.ghostMat = Mat("Ghost", new Color(0.9f, 0.92f, 1f), new Color(0.25f, 0.25f, 0.3f));
-    cfg.bossMat = Mat("Boss", new Color(0.95f, 0.45f, 0.05f));
+    cfg.bossMat = Mat("WolfFur", new Color(0.42f, 0.36f, 0.3f));
     cfg.fireMat = Mat("Fire", new Color(1f, 0.45f, 0.05f), new Color(1.5f, 0.5f, 0f));
     cfg.spellMat = Mat("Spell", new Color(0.6f, 1f, 0.4f), new Color(0.6f, 1.5f, 0.3f));
     cfg.sparkleMat = Mat("Sparkle", new Color(1f, 0.95f, 0.5f), new Color(1.5f, 1.3f, 0.4f));
@@ -89,13 +89,30 @@ public static class BuildWeb {
     var spawner = new GameObject("Spawner").AddComponent<Spawner>();
     spawner.table = table; spawner.cam = camGo.transform; spawner.player = player.transform;
 
-    var bossGo = Block(cfg, "Boss", cfg.cube, cfg.bossMat, new Vector3(40, 5, 0), new Vector3(2.4f, 2.4f, 2.4f), null);
-    var eyeL = Block(cfg, "Eye", cfg.cube, windowMat, Vector3.zero, Vector3.one, bossGo.transform);
-    eyeL.transform.localPosition = new Vector3(-0.25f, 0.15f, -0.51f); eyeL.transform.localScale = new Vector3(0.18f, 0.15f, 0.02f);
-    var eyeR = Object.Instantiate(eyeL, bossGo.transform); eyeR.transform.localPosition = new Vector3(0.25f, 0.15f, -0.51f);
-    var mouth = Object.Instantiate(eyeL, bossGo.transform); mouth.transform.localPosition = new Vector3(0, -0.2f, -0.51f); mouth.transform.localScale = new Vector3(0.55f, 0.1f, 0.02f);
-    bossGo.layer = Layers.Enemy; bossGo.AddComponent<BoxCollider>();
-    var boss = bossGo.AddComponent<Boss>(); boss.cam = camGo.transform; boss.player = player.transform;
+    // Werewolf boss (gray-box). Art swap point: Werewolf.visualPrefab (hides the "GrayBox" child when assigned).
+    var bossGo = new GameObject("Werewolf"); bossGo.layer = Layers.Enemy; bossGo.transform.position = new Vector3(40, 5, 0);
+    var gb = new GameObject("GrayBox").transform; gb.SetParent(bossGo.transform, false); gb.gameObject.layer = Layers.Enemy;
+    var fur = cfg.bossMat; var dark = Mat("WolfDark", new Color(0.18f, 0.15f, 0.13f));
+    var eyes = Mat("WolfEyes", new Color(1f, 0.9f, 0.2f), new Color(2f, 1.6f, 0.2f));
+    Part(cfg.cube, fur, gb, new Vector3(0, -0.1f, 0), new Vector3(1.5f, 1.8f, 1.1f), new Vector3(0, 0, -8));     // torso (hunched)
+    Part(cfg.cube, fur, gb, new Vector3(-0.55f, 1.15f, 0), new Vector3(1.0f, 0.85f, 0.9f), Vector3.zero);       // head
+    Part(cfg.cube, dark, gb, new Vector3(-1.2f, 1.0f, 0), new Vector3(0.6f, 0.4f, 0.5f), Vector3.zero);         // snout
+    Part(cfg.cube, dark, gb, new Vector3(-0.35f, 1.7f, 0.25f), new Vector3(0.22f, 0.45f, 0.15f), new Vector3(0, 0, 15)); // ears
+    Part(cfg.cube, dark, gb, new Vector3(-0.35f, 1.7f, -0.25f), new Vector3(0.22f, 0.45f, 0.15f), new Vector3(0, 0, 15));
+    Part(cfg.cube, eyes, gb, new Vector3(-0.95f, 1.3f, -0.46f), new Vector3(0.14f, 0.1f, 0.05f), Vector3.zero);
+    Part(cfg.cube, eyes, gb, new Vector3(-0.65f, 1.3f, -0.46f), new Vector3(0.14f, 0.1f, 0.05f), Vector3.zero);
+    Part(cfg.cube, fur, gb, new Vector3(-1.0f, 0.35f, -0.35f), new Vector3(1.1f, 0.35f, 0.35f), new Vector3(0, 0, 20)); // throwing arm
+    Part(cfg.cube, fur, gb, new Vector3(-0.4f, -0.3f, 0.4f), new Vector3(0.35f, 1.0f, 0.35f), new Vector3(0, 0, -15));
+    Part(cfg.cube, dark, gb, new Vector3(0.2f, -1.3f, 0.3f), new Vector3(0.4f, 0.9f, 0.4f), new Vector3(0, 0, 10));     // legs
+    Part(cfg.cube, dark, gb, new Vector3(0.45f, -1.3f, -0.3f), new Vector3(0.4f, 0.9f, 0.4f), new Vector3(0, 0, -10));
+    Part(cfg.cube, fur, gb, new Vector3(0.95f, -0.4f, 0), new Vector3(0.9f, 0.25f, 0.25f), new Vector3(0, 0, -35));    // tail
+    foreach (Transform c in gb) c.gameObject.layer = Layers.Enemy;
+    var bcol = bossGo.AddComponent<BoxCollider>(); bcol.center = new Vector3(-0.3f, 0.2f, 0); bcol.size = new Vector3(2.0f, 3.2f, 1.2f);
+    var boss = bossGo.AddComponent<Werewolf>(); boss.cam = camGo.transform; boss.player = player.transform; boss.grayBox = gb;
+    var ba = new GameObject("BossAudio").AddComponent<BossAudio>();
+    AudioClip Clip(string n) => AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/" + n);
+    ba.bossTheme = Clip("Music/boss_theme_loop.ogg"); ba.victory = Clip("Music/victory_sting.ogg");
+    ba.roar = Clip("SFX/werewolf_roar.ogg"); ba.hurt = Clip("SFX/boss_hurt.ogg"); ba.throwSfx = Clip("SFX/fireball_throw.ogg"); ba.defeat = Clip("SFX/boss_defeat.ogg");
 
     var gm = new GameObject("GameManager").AddComponent<GameManager>();
     gm.player = pc; gm.spawner = spawner; gm.boss = boss; gm.cam = camGo.transform;
@@ -112,7 +129,7 @@ public static class BuildWeb {
     g.AddComponent<MeshFilter>().sharedMesh = m; g.AddComponent<MeshRenderer>().sharedMaterial = mat; return g;
   }
   static void Part(Mesh m, Material mat, Transform parent, Vector3 lp, Vector3 ls, Vector3 euler){
-    var g = new GameObject("Part"); g.layer = Layers.Player; g.transform.SetParent(parent, false);
+    var g = new GameObject("Part"); g.layer = parent.gameObject.layer; g.transform.SetParent(parent, false);
     g.transform.localPosition = lp; g.transform.localScale = ls; g.transform.localRotation = Quaternion.Euler(euler);
     g.AddComponent<MeshFilter>().sharedMesh = m; g.AddComponent<MeshRenderer>().sharedMaterial = mat;
   }
@@ -145,6 +162,7 @@ public static class BuildWeb {
   public static void Build(){
     int code = 1;
     try {
+      if (!BossFairnessTest.Run()) throw new System.Exception("Boss fairness sweep found unfair patterns; see [Fairness] warnings");
       SetupScene();
       PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
       PlayerSettings.WebGL.decompressionFallback = true;

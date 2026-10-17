@@ -28,6 +28,8 @@ namespace BroomstickBash {
         || (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame)
         || (Touchscreen.current != null && Touchscreen.current.touches.Count > 1 && Touchscreen.current.touches[1].press.wasPressedThisFrame);
     }
+    /// <summary>Invulnerability without a hit (boss entry grace, defeat sequence). Flashes like a hit.</summary>
+    public void GrantInvulnerability(float seconds){ invuln = Mathf.Max(invuln, seconds); }
     public void Flap(){ vy = flapVelocity; flapsThisRun++; }
 
     public void Tick(float dt, float scroll){

@@ -22,7 +22,7 @@ namespace BroomstickBash {
       if (l == Layers.Hazard){ Puff.Burst(o.transform.position, GameConfig.I.sparkleMat, 4); Destroy(o.gameObject); Destroy(gameObject); return; }
       var ob = o.GetComponentInParent<ObstacleBase>();
       if (ob && ob.OnSpellHit()){ Destroy(gameObject); return; }
-      var boss = o.GetComponentInParent<Boss>();
+      var boss = o.GetComponentInParent<Werewolf>();
       if (boss){ boss.Damage(1); Destroy(gameObject); }
     }
   }

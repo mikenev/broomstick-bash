@@ -12,7 +12,9 @@ namespace BroomstickBash {
   public static class GameEvents {
     public static System.Action<int> PlayerHit;        // hearts left
     public static System.Action<ObstacleBase> EnemyKilled;
-    public static System.Action BossStarted, BossDefeated, GameOver, RunReset;
-    public static void Clear(){ PlayerHit = null; EnemyKilled = null; BossStarted = BossDefeated = GameOver = RunReset = null; }
+    public static System.Action BossStarted, BossDefeated, GameOver, RunReset, BossFired, Win;
+    public static System.Action<AttackKind> BossTelegraph;   // wind-up began (audio/VFX hook)
+    public static System.Action<int> BossHurt, BossPhaseChanged;
+    public static void Clear(){ PlayerHit = null; EnemyKilled = null; BossStarted = BossDefeated = GameOver = RunReset = BossFired = Win = null; BossTelegraph = null; BossHurt = BossPhaseChanged = null; }
   }
 }

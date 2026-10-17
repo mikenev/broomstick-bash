@@ -6,7 +6,7 @@ namespace BroomstickBash {
   public class GameManager : MonoBehaviour {
     public static GameManager I;
     const string HighKey = "BroomstickBash.HighScore";
-    public PlayerController player; public Spawner spawner; public Boss boss; public Transform cam;
+    public PlayerController player; public Spawner spawner; public Werewolf boss; public Transform cam;
     public GameState State { get; private set; } = GameState.Ready;
     public bool IsActive => State == GameState.Playing || State == GameState.Boss;
     public float Distance { get; private set; }
@@ -34,10 +34,17 @@ namespace BroomstickBash {
     public void StartBoss(){
       if (State == GameState.Ready) StartRun();
       if (State != GameState.Playing) return;
-      State = GameState.Boss; spawner.spawning = false; spawner.ClearAll(true); boss.Begin();
+      State = GameState.Boss; spawner.spawning = false; spawner.ClearAll(true);
+      ClearHazards();                                   // B mid-run: nothing left that can touch the witch
+      player.GrantInvulnerability(boss.entryGrace);     // short grace on boss entry
+      boss.Begin();
+    }
+    void ClearHazards(){
+      foreach (var f in FindObjectsByType<Fireball>(FindObjectsSortMode.None)){ Puff.Burst(f.transform.position, GameConfig.I.sparkleMat, 3); Destroy(f.gameObject); }
+      foreach (var o in FindObjectsByType<ObstacleBase>(FindObjectsSortMode.None)) o.Despawn();   // stragglers not tracked by the spawner
     }
     public void GameOver(){ if (!IsActive) return; State = GameState.GameOver; End(); GameEvents.GameOver?.Invoke(); }
-    public void Win(){ if (State != GameState.Boss) return; KillScore += 500; State = GameState.Win; End(); }
+    public void Win(){ if (State != GameState.Boss) return; KillScore += 500; State = GameState.Win; End(); GameEvents.Win?.Invoke(); }
     void End(){
       endTime = Time.unscaledTime;
       if (Score > HighScore){ HighScore = Score; newHigh = true; PlayerPrefs.SetInt(HighKey, Score); PlayerPrefs.Save(); }
@@ -78,8 +85,9 @@ namespace BroomstickBash {
       if (State == GameState.Boss){
         float w = 400 * s, x = (Screen.width - w) / 2;
         GUI.color = new Color(0, 0, 0, 0.6f); GUI.DrawTexture(new Rect(x, 20*s, w, 22*s), white);
-        GUI.color = new Color(1f, 0.5f, 0.1f); GUI.DrawTexture(new Rect(x, 20*s, w * Mathf.Max(0, boss.Hp) / boss.maxHp, 22*s), white);
-        GUI.color = Color.white; GUI.Label(new Rect(x, 44*s, w, 30*s), "THE GOURDLORD", small);
+        GUI.color = boss.Phase == 2 ? new Color(1f, 0.2f, 0.15f) : boss.Phase == 1 ? new Color(1f, 0.55f, 0.1f) : new Color(0.95f, 0.8f, 0.2f);
+        GUI.DrawTexture(new Rect(x, 20*s, w * Mathf.Max(0, boss.Hp) / boss.maxHp, 22*s), white);
+        GUI.color = Color.white; GUI.Label(new Rect(x, 44*s, w, 30*s), $"THE WEREWOLF   {Mathf.Max(0, boss.Hp)}/{boss.maxHp}", small);
       }
       var full = new Rect(0, 0, Screen.width, Screen.height);
       int sz = Mathf.RoundToInt(24 * s);
@@ -88,7 +96,7 @@ namespace BroomstickBash {
       else if (State == GameState.GameOver)
         GUI.Label(full, $"GAME OVER\n<size={sz + 6}>Score {Score}{(newHigh ? "  NEW BEST!" : "")}\nFlap or R to restart</size>", big);
       else if (State == GameState.Win)
-        GUI.Label(full, $"YOU WIN!\n<size={sz + 6}>The Gourdlord is vanquished!\nScore {Score}{(newHigh ? "  NEW BEST!" : "")}\nFlap or R to play again</size>", big);
+        GUI.Label(full, $"YOU WIN!\n<size={sz + 6}>The Werewolf is vanquished!\nScore {Score}{(newHigh ? "  NEW BEST!" : "")}\nFlap or R to play again</size>", big);
     }
   }
 }
