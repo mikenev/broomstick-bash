@@ -34,19 +34,22 @@ namespace BroomstickBash {
     public void Despawn(){ OnDespawned(); Destroy(gameObject); }
   }
 
+  /// <summary>Swooping bat: dives from its base height by up to <see cref="amp"/> and climbs back (envelope [y-amp, y]).</summary>
   public class Bat : ObstacleBase {
-    float baseY, phase;
+    public float amp = 1.2f; float baseY, phase;
     public override void OnSpawned(SpawnContext c){ base.OnSpawned(c); baseY = transform.position.y; phase = Random.value * 6f; }
     protected override void Tick(float dt){
-      var p = transform.position; p.x -= speed * dt; p.y = baseY + Mathf.Sin(t * 3f + phase) * 1.2f; transform.position = p;
+      float s = Mathf.Sin(t * 2.2f + phase);
+      var p = transform.position; p.x -= speed * dt; p.y = baseY - amp * s * s; transform.position = p;
       transform.localRotation = Quaternion.Euler(0, 0, Mathf.Sin(t * 20f) * 20f);
     }
   }
+  /// <summary>Drifting ghost: floats left on a sine wave of amplitude <see cref="amp"/> around its spawn height.</summary>
   public class Ghost : ObstacleBase {
+    public float amp = 1f; float baseY, phase;
+    public override void OnSpawned(SpawnContext c){ base.OnSpawned(c); baseY = transform.position.y; phase = Random.value * 6f; }
     protected override void Tick(float dt){
-      var p = transform.position; p.x -= speed * dt;
-      if (ctx.player) p.y = Mathf.MoveTowards(p.y, ctx.player.position.y, 1.3f * dt);
-      transform.position = p;
+      var p = transform.position; p.x -= speed * dt; p.y = baseY + amp * Mathf.Sin(t * 1.6f + phase); transform.position = p;
     }
   }
   public class Kid : ObstacleBase {

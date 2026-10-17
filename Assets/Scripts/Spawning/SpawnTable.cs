@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 namespace BroomstickBash {
-  public enum ObstacleKind { Kid, Car, Branch, Bat, Ghost }
+  public enum ObstacleKind { Kid, Car, Branch, Bat, Ghost, LampPost } // append only (serialized ints)
   [System.Serializable] public class SpawnEntry {
     public ObstacleKind kind;
     [Tooltip("Optional prefab (M2 art). If null, ObstacleFactory builds a gray-box version.")] public GameObject prefab;
@@ -17,6 +17,9 @@ namespace BroomstickBash {
     [Tooltip("Scroll speed multiplier vs difficulty 0..1")] public AnimationCurve speedByDifficulty = AnimationCurve.Linear(0, 1f, 1, 1.4f);
     [Tooltip("Distance (m) to reach difficulty 1")] public float rampDistance = 600f;
     [Tooltip("Distance (m) at which the boss appears")] public float bossDistance = 450f;
+    [Tooltip("M2: difficulty 0..1 vs ramp progress (Distance / rampDistance), non-linear with breathers")]
+    public AnimationCurve difficultyByProgress = AnimationCurve.Linear(0, 0, 1, 1);
+    public SpawnEntry EntryFor(ObstacleKind k){ foreach (var e in entries) if (e.kind == k) return e; return null; }
 
     public SpawnEntry Pick(float difficulty){
       float total = 0; foreach (var e in entries) if (difficulty >= e.minDifficulty) total += e.weight;
@@ -32,7 +35,21 @@ namespace BroomstickBash {
       t.entries.Add(new SpawnEntry{ kind = ObstacleKind.Branch, weight = 2 });
       t.entries.Add(new SpawnEntry{ kind = ObstacleKind.Bat, weight = 2.5f, minY = 3.5f, maxY = 7.5f });
       t.entries.Add(new SpawnEntry{ kind = ObstacleKind.Ghost, weight = 1.5f, minDifficulty = 0.15f, minY = 3f, maxY = 8f });
+      t.entries.Add(new SpawnEntry{ kind = ObstacleKind.LampPost, weight = 1.5f });
+      ApplyM2Curve(t);
       return t;
+    }
+    /// <summary>M2 tuning: ~2.5 min level. Difficulty eases in, has two breathers, and hits 1.0 at 85% of the level,
+    /// so the last ~20 s before the boss run at full difficulty. Speed and spawn rate follow difficulty.</summary>
+    public static void ApplyM2Curve(SpawnTable t){
+      t.difficultyByProgress = new AnimationCurve(
+        new Keyframe(0f, 0f, 0f, 0.4f), new Keyframe(0.25f, 0.18f), new Keyframe(0.40f, 0.36f),
+        new Keyframe(0.48f, 0.30f),            // breather
+        new Keyframe(0.68f, 0.64f), new Keyframe(0.76f, 0.58f), // breather
+        new Keyframe(1f, 1f, 2.2f, 0f));
+      t.speedByDifficulty = new AnimationCurve(new Keyframe(0, 1f), new Keyframe(0.5f, 1.22f), new Keyframe(1, 1.6f));
+      t.intervalByDifficulty = new AnimationCurve(new Keyframe(0, 1.9f), new Keyframe(0.5f, 1.25f), new Keyframe(1, 0.9f));
+      t.bossDistance = 1150f; t.rampDistance = t.bossDistance * 0.85f;
     }
   }
   /// <summary>Difficulty hook: 0..1. Override via Spawner.difficultyOverride for testing or a custom curve.</summary>

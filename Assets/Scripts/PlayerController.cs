@@ -30,9 +30,9 @@ namespace BroomstickBash {
     }
     public void Flap(){ vy = flapVelocity; flapsThisRun++; }
 
-    public void Tick(float dt, float scroll){
+    public void Tick(float dt, float scroll, bool readFlap = true){
       var cfg = GameConfig.I;
-      if (FlapPressed()) Flap();
+      if (readFlap && FlapPressed()) Flap();
       if (cool > 0) cool -= dt;
       if (CastPressed() && cool <= 0) CastSpell();
       vy = Mathf.Max(vy - gravity * dt, maxFall);
