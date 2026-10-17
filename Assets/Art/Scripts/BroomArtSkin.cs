@@ -5,7 +5,7 @@ namespace BroomstickBash.Art {
   /// <summary>Optional, code-free art hookup for the M1 gray-box objects. Each frame it looks at the scene's root objects
   /// (spawned obstacles are roots) and, for known names, hides the gray-box renderers and attaches the matching art prefab,
   /// fitted to the gray-box size. Colliders, layers, transforms and gameplay scripts are not touched.
-  /// Matched names: Kid, Car, Branch, LampPost, Ghost, Bat, Fireball, Boss. This is the ONLY obstacle art path (SpawnEntry.prefab is unused). Disable with BroomArtSkin.Enabled = false before scene load.
+  /// Matched names: Kid, Car, Branch, LampPost, Ghost, Bat, Fireball (Boss attaches its own art). This is the ONLY obstacle art path (SpawnEntry.prefab is unused). Disable with BroomArtSkin.Enabled = false before scene load.
   /// The player (Witch) and background are not auto-skinned: PlayerController re-enables its cached renderers while
   /// flashing, and the parallax layers need a scroller - both should be wired in M1 code (see Assets/Art/README.md).</summary>
   public class BroomArtSkin : MonoBehaviour {
@@ -43,7 +43,7 @@ namespace BroomstickBash.Art {
         case "Ghost": Fit(r, "Ghost", 0.9f, Vector3.zero, false); return true;
         case "Bat": Fit(r, "Bat", 1.6f, Vector3.zero, false); return true;
         case "Fireball": Fit(r, "FX_Fireball", 0.9f, Vector3.zero, false); return true;
-        case "Boss": Fit(r, "Werewolf", 1.0f, new Vector3(0, -0.55f, 0), false); return true;
+        // "Boss": not skinned here - the werewolf boss attaches its own art (M3).
         case "BroomArtSkin": return true;
       }
       return r.name.Length > 0; // anything else: mark seen (re-checked only if renamed/re-created)
