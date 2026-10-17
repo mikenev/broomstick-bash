@@ -63,7 +63,7 @@ public static class BuildWeb {
 
     var camGo = new GameObject("Main Camera"); camGo.tag = "MainCamera";
     var cam = camGo.AddComponent<Camera>(); cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = RenderSettings.fogColor;
-    cam.fieldOfView = 38; cam.farClipPlane = 120; camGo.AddComponent<UniversalAdditionalCameraData>();
+    cam.fieldOfView = 38; cam.farClipPlane = 120; camGo.AddComponent<UniversalAdditionalCameraData>(); camGo.AddComponent<AudioListener>();
     camGo.AddComponent<SideCamera>().target = player.transform; camGo.transform.position = new Vector3(5, 5, -17);
 
     // Scenery: street tiles + houses + lamps, recycled around the camera.

@@ -12,7 +12,7 @@ namespace BroomstickBash {
     enum Mode { Entering, Idle, Telegraph, Defeated }
     [Header("Art")] public GameObject visualPrefab; public Transform grayBox;
     public Vector3 artOffset = new Vector3(-0.2f, -1.75f, 0); public float artScale = 1.25f;
-    GameObject art; Animator anim;
+    GameObject art; Animator anim; PhaseTuning committed;
     [Header("Refs")] public Transform cam, player;
     [Header("Stats")] public int maxHp = 12;
     public float entryGrace = 2.5f;               // witch invulnerable + no attacks after boss entry
@@ -96,7 +96,7 @@ namespace BroomstickBash {
       for (int tries = 0; tries < 5 && planned == null; tries++){
         var rel = FireballPatterns.Build(pending, tun, HandRel, y, m.groundY, m.ceilingY, rng);
         EnforceMinDistance(rel);
-        if (FairnessValidator.IsFair(FairnessValidator.ToAbsolute(rel, y), m, y, vy, tun.telegraph)) planned = rel;
+        if (rel.Count > 0 && FairnessValidator.IsFair(FairnessValidator.ToAbsolute(rel, y), m, y, vy, tun.telegraph)) planned = rel;
         else RejectedPatterns++;
       }
       if (planned == null){
@@ -104,10 +104,10 @@ namespace BroomstickBash {
         var fb = new PhaseTuning{ fireballSpeed = 3.2f, aimedCount = 1, telegraph = tun.telegraph };
         var rel = FireballPatterns.Build(AttackKind.Aimed, fb, HandRel, y, m.groundY, m.ceilingY, rng);
         EnforceMinDistance(rel);
-        planned = FairnessValidator.IsFair(FairnessValidator.ToAbsolute(rel, y), m, y, vy, tun.telegraph) ? rel : null;
+        planned = rel.Count > 0 && FairnessValidator.IsFair(FairnessValidator.ToAbsolute(rel, y), m, y, vy, tun.telegraph) ? rel : null;
       }
       if (planned == null){ timer = tun.rest; return; }   // nothing fair right now: skip a beat
-      mode = Mode.Telegraph; timer = tun.telegraph; SetTint(TellColor);
+      mode = Mode.Telegraph; timer = tun.telegraph; committed = tun;   // phase can't change a committed attack SetTint(TellColor);
       SpawnTells();
       GameEvents.BossTelegraph?.Invoke(pending);
     }
@@ -123,7 +123,7 @@ namespace BroomstickBash {
       }
     }
     void TelegraphTick(){
-      float k = 1f - Mathf.Clamp01(timer / Mathf.Max(0.01f, Tuning.telegraph));
+      float k = 1f - Mathf.Clamp01(timer / Mathf.Max(0.01f, committed.telegraph));
       transform.localScale = new Vector3(1f + 0.08f * k, 1f - 0.12f * k, 1f);
       // blink faster as it gets closer to firing
       bool on = Mathf.Repeat(t * (4f + 10f * k), 1f) < 0.6f;
@@ -149,7 +149,7 @@ namespace BroomstickBash {
       }
       ClearTells(); SetTint(null); transform.localScale = Vector3.one;
       if (art) BroomArt.Trigger(art, "Throw");
-      mode = Mode.Idle; timer = Tuning.rest; FiredPatterns++;
+      mode = Mode.Idle; timer = committed.rest; FiredPatterns++;
       GameEvents.BossFired?.Invoke();
     }
     System.Collections.IEnumerator Delayed(Shot s, Vector3 at){
