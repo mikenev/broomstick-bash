@@ -29,7 +29,10 @@ def mat(n):
         if n.startswith("Outline"):  # preview-only node setup: hide back-facing hull faces (= Unity Cull Back), so only the rim behind the model shows
             nt = m.node_tree; out = nt.nodes["Material Output"]; em = nt.nodes.new("ShaderNodeEmission"); em.inputs[0].default_value = (*c, 1)
             tr = nt.nodes.new("ShaderNodeBsdfTransparent"); mx = nt.nodes.new("ShaderNodeMixShader"); geo = nt.nodes.new("ShaderNodeNewGeometry")
-            nt.links.new(geo.outputs["Backfacing"], mx.inputs[0]); nt.links.new(em.outputs[0], mx.inputs[1]); nt.links.new(tr.outputs[0], mx.inputs[2])
+            lp = nt.nodes.new("ShaderNodeLightPath"); inv = nt.nodes.new("ShaderNodeMath"); inv.operation = "SUBTRACT"; inv.inputs[0].default_value = 1.0
+            nt.links.new(lp.outputs["Is Camera Ray"], inv.inputs[1]); mxv = nt.nodes.new("ShaderNodeMath"); mxv.operation = "MAXIMUM"
+            nt.links.new(geo.outputs["Backfacing"], mxv.inputs[0]); nt.links.new(inv.outputs[0], mxv.inputs[1])  # no light emitted onto the model
+            nt.links.new(mxv.outputs[0], mx.inputs[0]); nt.links.new(em.outputs[0], mx.inputs[1]); nt.links.new(tr.outputs[0], mx.inputs[2])
             nt.links.new(mx.outputs[0], out.inputs[0]); m.use_backface_culling = True
         if n == "GhostBody": b.inputs["Alpha"].default_value = 0.8; m.blend_method = "BLEND"
         m.diffuse_color = (*c, 1)
