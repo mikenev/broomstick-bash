@@ -30,7 +30,7 @@ namespace BroomstickBash {
 
     void Awake(){
       I = this;
-      musA = NewSource(true); musB = NewSource(true); sfx = NewSource(false); active = musA;
+      musA = NewSource(true); musB = NewSource(true); sfx = NewSource(false); sfx.volume = 1f; active = musA;   // one-shots scale by PlayOneShot volume; source must be at 1
       rules = new Dictionary<string, Rule>();
       void R(string id, AudioClip c, float v, float g){ rules[id] = new Rule{ clip = c, vol = v, minGap = g }; }
       R("flap", flap, 0.30f, 0.12f); R("cast", cast, 0.45f, 0.10f); R("spellHit", spellHit, 0.50f, 0.06f); R("sparkle", sparkle, 0.45f, 0.20f);
