@@ -21,7 +21,7 @@ namespace BroomstickBash {
       if (l == Layers.Kid){ Puff.Burst(o.transform.position + Vector3.up * 0.5f, GameConfig.I.sparkleMat, 10, 0.12f, 3f); GameEvents.SpellSparkle?.Invoke(); return; }
       if (l == Layers.Hazard){ Puff.Burst(o.transform.position, GameConfig.I.sparkleMat, 4); Destroy(o.gameObject); Destroy(gameObject); GameEvents.FireballZapped?.Invoke(); return; }
       var ob = o.GetComponentInParent<ObstacleBase>();
-      if (ob && ob.OnSpellHit()){ Destroy(gameObject); if (ob.gameObject.layer == Layers.Enemy) GameEvents.SpellHit?.Invoke(); else GameEvents.SpellBlocked?.Invoke(); return; }
+      if (ob && ob.OnSpellHit()){ Destroy(gameObject); if (ob.gameObject.layer != Layers.Enemy) GameEvents.SpellBlocked?.Invoke(); else if (ob.hp > 0) GameEvents.SpellHit?.Invoke(); return; }   // lethal hits: EnemyKilled plays the pop
       var boss = o.GetComponentInParent<Werewolf>();
       if (boss){ boss.Damage(1); Destroy(gameObject); }   // audio comes from BossHurt / BossImmune
     }
