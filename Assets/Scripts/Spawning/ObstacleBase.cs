@@ -12,7 +12,7 @@ namespace BroomstickBash {
     public int hp = 1;
     public int scoreValue = 10;
     protected SpawnContext ctx; protected float t;
-    public virtual void OnSpawned(SpawnContext c){ ctx = c; }
+    public virtual void OnSpawned(SpawnContext c){ ctx = c; GameEvents.ObstacleSpawned?.Invoke(this); }
     public virtual void OnDespawned(){}
     protected virtual void Tick(float dt){ transform.position += Vector3.left * speed * dt; }
     void Update(){

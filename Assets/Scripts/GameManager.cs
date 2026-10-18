@@ -55,7 +55,9 @@ namespace BroomstickBash {
     }
     void Update(){
       var kb = Keyboard.current;
-      if (kb != null && kb.bKey.wasPressedThisFrame) StartBoss();          // debug/QA: jump to boss
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+      if (kb != null && kb.bKey.wasPressedThisFrame) StartBoss();          // dev/QA only: jump to boss
+#endif
       bool ended = State == GameState.GameOver || State == GameState.Win;
       if (kb != null && kb.rKey.wasPressedThisFrame && State != GameState.Ready){ if (ended){ if (Time.unscaledTime - endTime > 0.6f) Restart(); } else ResetRun(); return; }
       if (State == GameState.Ready){ if (PlayerController.FlapPressed()) StartRun(); return; }
@@ -72,6 +74,11 @@ namespace BroomstickBash {
     }
 
     GUIStyle big, small; Texture2D white;
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+    const string DebugHint = "B: skip to boss (dev build)     ";
+#else
+    const string DebugHint = "";
+#endif
     void OnGUI(){
       float s = Screen.height / 720f;
       if (!white){ white = Texture2D.whiteTexture; }
@@ -109,7 +116,7 @@ namespace BroomstickBash {
       var full = new Rect(0, 0, Screen.width, Screen.height);
       int sz = Mathf.RoundToInt(24 * s);
       if (State == GameState.Ready)
-        GUI.Label(full, $"BROOMSTICK BASH\n<size={sz}>Space / click / tap: flap     X / F / right-click: cast spell\nSpells zap bats & ghosts, but sparkle harmlessly past trick-or-treaters. Don't touch anything!\nB: skip to boss (debug)     R: restart\n\nFlap to start</size>", big);
+        GUI.Label(full, $"BROOMSTICK BASH\n<size={sz}>Space / click / tap: flap     X / F / right-click: cast spell\nSpells zap bats & ghosts, but sparkle harmlessly past trick-or-treaters. Don't touch anything!\n{DebugHint}R: restart\n\nFlap to start</size>", big);
       else if (State == GameState.GameOver)
         GUI.Label(full, $"GAME OVER\n<size={sz + 6}>Score {Score}{(newHigh ? "  NEW BEST!" : "")}\nFlap or R to restart</size>", big);
       else if (State == GameState.Win)
