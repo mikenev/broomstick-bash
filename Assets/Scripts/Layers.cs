@@ -20,6 +20,10 @@ namespace BroomstickBash {
     public static System.Action<AttackKind> BossTelegraph;   // M3: wind-up began (audio/VFX hook)
     public static System.Action<int> BossHurt, BossPhaseChanged;   // M3
     public static System.Action BossImmune;   // spell hit the boss during its entry grace (fizzle)
-    public static void Clear(){ PlayerHit = null; EnemyKilled = null; BossStarted = BossDefeated = GameOver = RunReset = BossFired = null; Won = null; RunEnded = null; BossTelegraph = null; BossHurt = BossPhaseChanged = null; BossImmune = null; }
+    /// <summary>Audio hooks: spell cast / spell damaged an enemy or the boss / spell passed through a kid (sparkle) /
+    /// spell blocked by an obstacle / spell destroyed a fireball. ObstacleSpawned fires from ObstacleBase.OnSpawned.</summary>
+    public static System.Action SpellCast, SpellHit, SpellSparkle, SpellBlocked, FireballZapped;
+    public static System.Action<ObstacleBase> ObstacleSpawned;
+    public static void Clear(){ PlayerHit = null; EnemyKilled = null; BossStarted = BossDefeated = GameOver = RunReset = BossFired = null; Won = null; RunEnded = null; BossTelegraph = null; BossHurt = BossPhaseChanged = null; BossImmune = null; SpellCast = SpellHit = SpellSparkle = SpellBlocked = FireballZapped = null; ObstacleSpawned = null; }
   }
 }

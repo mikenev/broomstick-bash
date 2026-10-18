@@ -113,10 +113,15 @@ public static class BuildWeb {
     var bcol = bossGo.AddComponent<BoxCollider>(); bcol.center = new Vector3(-0.3f, 0.2f, 0); bcol.size = new Vector3(2.0f, 3.2f, 1.2f);
     var boss = bossGo.AddComponent<Werewolf>(); boss.cam = camGo.transform; boss.player = player.transform; boss.grayBox = gb;
     boss.visualPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Art/Resources/Art/BA_Werewolf.prefab");   // Art PR #3 (null -> gray box)
-    var ba = new GameObject("BossAudio").AddComponent<BossAudio>();
-    AudioClip Clip(string n) => AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/" + n);
-    ba.bossTheme = Clip("Music/boss_theme_loop.ogg"); ba.victory = Clip("Music/victory_sting.ogg");
-    ba.roar = Clip("SFX/werewolf_roar.ogg"); ba.hurt = Clip("SFX/boss_hurt.ogg"); ba.throwSfx = Clip("SFX/fireball_throw.ogg"); ba.defeat = Clip("SFX/boss_defeat.ogg");
+    var ga = new GameObject("GameAudio").AddComponent<GameAudio>();
+    AudioClip Clip(string n){ var c = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/" + n); if (!c) Debug.LogWarning("[Audio] missing clip " + n); return c; }
+    ga.mainTheme = Clip("Music/main_theme_loop.ogg"); ga.bossTheme = Clip("Music/boss_theme_loop.ogg");
+    ga.titleSting = Clip("Music/title_sting.ogg"); ga.gameOverSting = Clip("Music/gameover_sting.ogg"); ga.victorySting = Clip("Music/victory_sting.ogg");
+    ga.flap = Clip("SFX/flap_whoosh.ogg"); ga.cast = Clip("SFX/spell_cast.ogg"); ga.spellHit = Clip("SFX/fireball_impact.ogg");   // non-lethal spell hit (lethal hits play enemy_pop)
+    ga.sparkle = Clip("SFX/kid_sparkle.ogg"); ga.hurt = Clip("SFX/hit_ouch.ogg"); ga.honk = Clip("SFX/car_honk.ogg");
+    ga.bat = Clip("SFX/bat_screech.ogg"); ga.ghost = Clip("SFX/ghost_wail.ogg"); ga.enemyPop = Clip("SFX/enemy_pop.ogg");
+    ga.fireballImpact = Clip("SFX/fireball_impact.ogg"); ga.uiClick = Clip("SFX/ui_click.ogg");
+    ga.roar = Clip("SFX/werewolf_roar.ogg"); ga.bossHurt = Clip("SFX/boss_hurt.ogg"); ga.fireballThrow = Clip("SFX/fireball_throw.ogg"); ga.bossDefeat = Clip("SFX/boss_defeat.ogg");
 
     var gm = new GameObject("GameManager").AddComponent<GameManager>();
     gm.player = pc; gm.spawner = spawner; gm.boss = boss; gm.cam = camGo.transform;
