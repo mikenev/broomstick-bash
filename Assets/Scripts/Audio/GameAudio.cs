@@ -19,31 +19,33 @@ namespace BroomstickBash {
     public string CurrentTrack => target ? target.name : "none";
 
     AudioSource musA, musB, sfx, active; AudioClip target; float duck = 1f, duckUntil;
-    readonly Dictionary<AudioClip, float> lastPlay = new();
+    readonly Dictionary<string, float> lastPlay = new();
     GameState lastState = (GameState)(-1);
     int lastFlaps;
     GameManager gm;
 
-    struct Rule { public float vol, minGap; public Rule(float v, float g){ vol = v; minGap = g; } }
-    Dictionary<AudioClip, Rule> rules;
+    struct Rule { public AudioClip clip; public float vol, minGap; }
+    /// <summary>Logical sound id -> clip, volume, minimum gap (s). Keyed by id so two sounds can share a clip.</summary>
+    Dictionary<string, Rule> rules;
 
     void Awake(){
       I = this;
       musA = NewSource(true); musB = NewSource(true); sfx = NewSource(false); active = musA;
-      rules = new Dictionary<AudioClip, Rule>();
-      void R(AudioClip c, float v, float g){ if (c) rules[c] = new Rule(v, g); }
-      R(flap, 0.30f, 0.12f); R(cast, 0.45f, 0.10f); R(spellHit, 0.60f, 0.06f); R(sparkle, 0.45f, 0.20f);
-      R(hurt, 0.90f, 0.30f); R(honk, 0.40f, 2.50f); R(bat, 0.35f, 1.50f); R(ghost, 0.40f, 2.50f);
-      R(enemyPop, 0.55f, 0.06f); R(fireballImpact, 0.55f, 0.10f); R(uiClick, 0.35f, 0.15f);
-      R(roar, 0.90f, 1.0f); R(bossHurt, 0.55f, 0.12f); R(fireballThrow, 0.40f, 0.25f); R(bossDefeat, 0.90f, 1f);
-      R(titleSting, 0.60f, 1f); R(gameOverSting, 0.75f, 1f); R(victorySting, 0.80f, 1f);
+      rules = new Dictionary<string, Rule>();
+      void R(string id, AudioClip c, float v, float g){ rules[id] = new Rule{ clip = c, vol = v, minGap = g }; }
+      R("flap", flap, 0.30f, 0.12f); R("cast", cast, 0.45f, 0.10f); R("spellHit", spellHit, 0.50f, 0.06f); R("sparkle", sparkle, 0.45f, 0.20f);
+      R("immune", sparkle, 0.30f, 0.25f); R("hurt", hurt, 0.90f, 0.30f); R("honk", honk, 0.40f, 2.50f); R("bat", bat, 0.35f, 1.50f);
+      R("ghost", ghost, 0.40f, 2.50f); R("pop", enemyPop, 0.55f, 0.06f); R("blocked", fireballImpact, 0.33f, 0.10f);
+      R("zap", fireballImpact, 0.55f, 0.10f); R("ui", uiClick, 0.35f, 0.15f);
+      R("roar", roar, 0.90f, 1.0f); R("phaseRoar", roar, 0.72f, 1.0f); R("bossHurt", bossHurt, 0.55f, 0.12f); R("throw", fireballThrow, 0.40f, 0.25f);
+      R("bossDefeat", bossDefeat, 0.90f, 1f); R("title", titleSting, 0.60f, 1f); R("gameOver", gameOverSting, 0.75f, 1f); R("victory", victorySting, 0.80f, 1f);
     }
     AudioSource NewSource(bool loop){ var s = gameObject.AddComponent<AudioSource>(); s.playOnAwake = false; s.loop = loop; s.volume = 0; return s; }
 
     void OnEnable(){
       GameEvents.PlayerHit += OnPlayerHit; GameEvents.EnemyKilled += OnKilled; GameEvents.ObstacleSpawned += OnSpawned;
       GameEvents.SpellCast += OnCast; GameEvents.SpellHit += OnSpellHit; GameEvents.SpellSparkle += OnSparkle;
-      GameEvents.SpellBlocked += OnBlocked; GameEvents.FireballZapped += OnZapped;
+      GameEvents.SpellBlocked += OnBlocked; GameEvents.FireballZapped += OnZapped; GameEvents.BossImmune += OnImmune;
       GameEvents.BossStarted += OnBossStart; GameEvents.BossPhaseChanged += OnPhase; GameEvents.BossHurt += OnBossHurt;
       GameEvents.BossFired += OnBossFired; GameEvents.BossDefeated += OnBossDefeated;
       GameEvents.GameOver += OnGameOver; GameEvents.Won += OnWon; GameEvents.RunReset += OnReset;
@@ -51,7 +53,7 @@ namespace BroomstickBash {
     void OnDisable(){
       GameEvents.PlayerHit -= OnPlayerHit; GameEvents.EnemyKilled -= OnKilled; GameEvents.ObstacleSpawned -= OnSpawned;
       GameEvents.SpellCast -= OnCast; GameEvents.SpellHit -= OnSpellHit; GameEvents.SpellSparkle -= OnSparkle;
-      GameEvents.SpellBlocked -= OnBlocked; GameEvents.FireballZapped -= OnZapped;
+      GameEvents.SpellBlocked -= OnBlocked; GameEvents.FireballZapped -= OnZapped; GameEvents.BossImmune -= OnImmune;
       GameEvents.BossStarted -= OnBossStart; GameEvents.BossPhaseChanged -= OnPhase; GameEvents.BossHurt -= OnBossHurt;
       GameEvents.BossFired -= OnBossFired; GameEvents.BossDefeated -= OnBossDefeated;
       GameEvents.GameOver -= OnGameOver; GameEvents.Won -= OnWon; GameEvents.RunReset -= OnReset;
@@ -67,10 +69,9 @@ namespace BroomstickBash {
     }
     void Unlock(){
       if (Unlocked) return; Unlocked = true;
-      AudioListener.pause = false;
       Debug.Log("[Audio] unlocked on first input; music=" + CurrentTrack);
       if (target){ active.clip = target; active.volume = 0; active.Play(); }
-      One(titleSting);
+      One("title");
     }
 
     void Update(){
@@ -78,11 +79,11 @@ namespace BroomstickBash {
       if (!gm) gm = GameManager.I;
       if (gm){
         if (gm.State != lastState){
-          if (gm.State == GameState.Playing && (lastState == GameState.Ready || (int)lastState == -1)) One(uiClick);
+          if (gm.State == GameState.Playing && (lastState == GameState.Ready || (int)lastState == -1)) One("ui");
           lastState = gm.State;
         }
         int f = gm.player ? gm.player.flapsThisRun : 0;   // flap SFX without touching PlayerController
-        if (f > lastFlaps && gm.IsActive) One(flap);
+        if (f > lastFlaps && gm.IsActive) One("flap");
         lastFlaps = f;
       }
       // music crossfade toward `target`
@@ -109,35 +110,35 @@ namespace BroomstickBash {
     }
     void Duck(float level, float seconds){ duck = Mathf.Min(duck, level); duckUntil = Time.unscaledTime + seconds; }
 
-    /// <summary>Rate-limited one-shot. Returns false if suppressed.</summary>
-    public bool One(AudioClip c, float extra = 1f){
-      if (!c || !Unlocked) return false;
-      var r = rules.TryGetValue(c, out var rr) ? rr : new Rule(0.6f, 0.08f);
-      if (lastPlay.TryGetValue(c, out var t) && Time.unscaledTime - t < r.minGap) return false;
-      lastPlay[c] = Time.unscaledTime;
-      sfx.PlayOneShot(c, r.vol * extra * sfxVolume);
+    /// <summary>Rate-limited one-shot by sound id. Returns false if suppressed (locked, missing clip or too soon).</summary>
+    public bool One(string id){
+      if (!Unlocked || !rules.TryGetValue(id, out var r) || !r.clip) return false;
+      if (lastPlay.TryGetValue(id, out var t) && Time.unscaledTime - t < r.minGap) return false;
+      lastPlay[id] = Time.unscaledTime;
+      sfx.PlayOneShot(r.clip, r.vol * sfxVolume);
       return true;
     }
 
     // ---------- event handlers ----------
-    void OnPlayerHit(int hearts){ One(hurt); }
-    void OnKilled(ObstacleBase o){ One(enemyPop); }
+    void OnPlayerHit(int hearts){ One("hurt"); }
+    void OnKilled(ObstacleBase o){ One("pop"); }
     void OnSpawned(ObstacleBase o){
       if (!o) return;
-      switch (o.kind){ case ObstacleKind.Car: One(honk); break; case ObstacleKind.Bat: One(bat); break; case ObstacleKind.Ghost: One(ghost); break; }
+      switch (o.kind){ case ObstacleKind.Car: One("honk"); break; case ObstacleKind.Bat: One("bat"); break; case ObstacleKind.Ghost: One("ghost"); break; }
     }
-    void OnCast(){ One(cast); }
-    void OnSpellHit(){ One(spellHit); }
-    void OnSparkle(){ One(sparkle); }
-    void OnBlocked(){ One(fireballImpact, 0.6f); }
-    void OnZapped(){ One(fireballImpact); }
-    void OnBossStart(){ One(roar); Music(bossTheme); }
-    void OnPhase(int p){ One(roar, 0.8f); }
-    void OnBossHurt(int hp){ if (hp > 0) One(bossHurt); }
-    void OnBossFired(){ One(fireballThrow); }
-    void OnBossDefeated(){ One(bossDefeat); Music(mainTheme); Duck(0.25f, 4f); }
-    void OnGameOver(){ One(gameOverSting); Music(mainTheme); Duck(0.3f, 3f); }
-    void OnWon(int score){ One(victorySting); Duck(0.25f, 4f); }
+    void OnCast(){ One("cast"); }
+    void OnSpellHit(){ One("spellHit"); }
+    void OnSparkle(){ One("sparkle"); }
+    void OnBlocked(){ One("blocked"); }
+    void OnZapped(){ One("zap"); }
+    void OnImmune(){ One("immune"); }   // soft fizzle: the spell connected but the werewolf is still in its entry grace
+    void OnBossStart(){ One("roar"); Music(bossTheme); }
+    void OnPhase(int p){ One("phaseRoar"); }
+    void OnBossHurt(int hp){ if (hp > 0) One("bossHurt"); }
+    void OnBossFired(){ One("throw"); }
+    void OnBossDefeated(){ One("bossDefeat"); Music(mainTheme); Duck(0.25f, 4f); }
+    void OnGameOver(){ One("gameOver"); Music(mainTheme); Duck(0.3f, 3f); }
+    void OnWon(int score){ One("victory"); Duck(0.25f, 4f); }
     void OnReset(){ Music(mainTheme); lastFlaps = 0; }
   }
 }

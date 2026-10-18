@@ -23,7 +23,7 @@ namespace BroomstickBash {
       var ob = o.GetComponentInParent<ObstacleBase>();
       if (ob && ob.OnSpellHit()){ Destroy(gameObject); if (ob.gameObject.layer == Layers.Enemy) GameEvents.SpellHit?.Invoke(); else GameEvents.SpellBlocked?.Invoke(); return; }
       var boss = o.GetComponentInParent<Werewolf>();
-      if (boss){ boss.Damage(1); Destroy(gameObject); GameEvents.SpellHit?.Invoke(); }
+      if (boss){ boss.Damage(1); Destroy(gameObject); }   // audio comes from BossHurt / BossImmune
     }
   }
 }
